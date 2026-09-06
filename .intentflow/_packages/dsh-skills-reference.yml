@@ -1,0 +1,38 @@
+packageName: dsh-skills-reference
+summary: |
+  跨工作区 skill 引用插件。宿主半：引用声明（.dsh/skill-references.yml）的数据存取 + 复用官方 dsh-skill-filesystem 的发现
+  provider（引用源优先、随声明变化即时失效）+ 经 Typert 暴露给浏览器的 list/replace RPC。Web 半：基于 React 的可视化
+  面板（侧边栏入口 + overlay 窗口），图形化管理声明并预览已生效 skill。构建：build.mjs（esbuild 产出 lib/client.js）+ tsc。
+
+groups:
+  - name: 宿主数据与 skill 发现
+    summary: 声明文件从 schema 到 skill provider 的完整宿主链路——声明 YAML 解析/序列化、读写存取、包装官方
+      FileSystemSkillProvider 为「引用源优先」的 skill 来源，随目录/声明变化失效重发现。
+    files:
+      - test/reference-provider.test.ts
+      - test/references-store.test.ts
+      - test/schema.test.ts
+      - src/reference-provider.ts
+      - src/references-store.ts
+      - src/schema.ts
+
+  - name: 宿主 Typert RPC 与装配
+    summary: 把宿主声明读写暴露为浏览器可调用的远程方法——host/client 共享的 strict descriptor 契约、SkillReferenceService
+      (list/replace)、TYPERT manifestation，以及把它们装配进 ctx.skills/ctx.typert 的入口。
+    files:
+      - test/contract.test.ts
+      - test/rpc.test.ts
+      - src/rpc.ts
+      - src/typert-host.ts
+      - src/contract.ts
+      - src/index.ts
+
+  - name: Client 可视化窗口
+    summary: Web 半的面板能力——typert remote 装配、面板状态机（载入/编辑/保存/预览）、React 面板与入口按钮组件、
+      client 装配入口，以及产出宿主 client 模块格式的 esbuild 构建脚本。
+    files:
+      - build.mjs
+      - src/client/client.ts
+      - src/client/controller.ts
+      - src/client/panel.tsx
+      - src/client/typert-remote.ts

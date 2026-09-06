@@ -1,0 +1,49 @@
+{
+  "name": "dsh-skills-reference",
+  "version": "0.1.0",
+  "description": "DSH 插件：跨工作区 skill 引用，复用官方 skill-filesystem 发现机制，一次更新处处复用",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node build.mjs",
+    "build:host": "tsc -p tsconfig.json",
+    "build:client": "node build.mjs",
+    "test": "node --test test/"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "yaml": "^2.4.2",
+    "zod": "^4.5.4"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-skill": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-skill-filesystem": "^0.1.1-rc.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-skill": "^0.1.1-rc.2",
+    "@deepseek-ai/dsh-skill-filesystem": "^0.1.1-rc.2",
+    "@types/node": "^26.4.1",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.13",
+    "typescript": "^5.6.0"
+  }
+}
