@@ -29,7 +29,8 @@ groups:
 
   - name: Client 可视化窗口
     summary: Web 半的面板能力——typert remote 装配、面板状态机（载入/编辑/保存/预览）、React 面板与入口按钮组件、
-      client 装配入口，以及产出宿主 client 模块格式的 esbuild 构建脚本。
+      client 装配入口，以及产出宿主 client 模块格式的 esbuild 构建脚本。面板样式由 DSH 原生语义 token（--dsw-alias-*）
+      驱动、随主题色板（light/dark/system）自动适配深浅，不引用自造 token 或硬编码色值。
     files:
       - build.mjs
       - src/client/client.ts

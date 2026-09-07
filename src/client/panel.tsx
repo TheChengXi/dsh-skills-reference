@@ -4,7 +4,8 @@
  * SkillReferencePanel（shell.overlay）用 useSyncExternalStore 订阅 controller 状态，呈现声明条目编辑器（增删改 + 选目录）、
  * 已生效 skill 预览、保存/取消；错误以状态条呈现。纯展示 + 回调 controller，不直接触达宿主。文本全部走注入的 t。
  *
- * 边界：不引入 css module，用内联样式 + DSW CSS 变量适配主题；组件只依赖 {controller,t} 两个注入属性，忽略 slot 标准 props。
+ * 边界：不引入 css module；样式以内联方式引用 DSH 原生语义 token（--dsw-alias-*），不另造 token 名、不写死色值兜底，随主题色板
+ * （light/dark/system）自动适配深浅；组件只依赖 {controller,t} 两个注入属性，忽略 slot 标准 props。
  *
  * 验收条件：
  * - open=false 时渲染 null（不占 overlay 布局）
@@ -29,9 +30,9 @@ const entryLabelStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   padding: "6px 10px",
   borderRadius: 6,
-  border: "1px solid var(--dsw-alias-border-l1, #ccc)",
-  background: "var(--dsw-alias-bg-base, #fff)",
-  color: "var(--dsw-alias-fg-base, #111)",
+  border: "1px solid var(--dsw-alias-border-l1)",
+  background: "var(--dsw-alias-bg-layer-1)",
+  color: "var(--dsw-alias-label-primary)",
   fontSize: 13,
 };
 
@@ -147,9 +148,9 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
 const buttonStyle: CSSProperties = {
   padding: "6px 12px",
   borderRadius: 6,
-  border: "1px solid var(--dsw-alias-border-l1, #ccc)",
-  background: "var(--dsw-alias-button-secondary-fill, #f2f2f2)",
-  color: "var(--dsw-alias-fg-base, #111)",
+  border: "1px solid var(--dsw-alias-border-l1)",
+  background: "var(--dsw-alias-button-secondary-fill)",
+  color: "var(--dsw-alias-label-primary)",
   fontSize: 13,
   cursor: "pointer",
 };
@@ -161,7 +162,7 @@ const backdropStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   pointerEvents: "auto",
-  background: "rgba(0,0,0,0.28)",
+  background: "var(--dsw-alias-bg-mask-1)",
   zIndex: 20,
 };
 
@@ -171,9 +172,9 @@ const cardStyle: CSSProperties = {
   width: "min(720px, 90vw)",
   maxHeight: "80vh",
   borderRadius: 12,
-  background: "var(--dsw-alias-bg-base, #fff)",
-  color: "var(--dsw-alias-fg-base, #111)",
-  boxShadow: "0 16px 48px rgba(0,0,0,0.24)",
+  background: "var(--dsw-alias-bg-base)",
+  color: "var(--dsw-alias-label-primary)",
+  boxShadow: "var(--dsw-shadow-lv3)",
   overflow: "hidden",
   pointerEvents: "auto",
 };
@@ -183,7 +184,7 @@ const headerStyle: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   padding: "12px 16px",
-  borderBottom: "1px solid var(--dsw-alias-border-l2, #eee)",
+  borderBottom: "1px solid var(--dsw-alias-border-l2)",
 };
 
 const footerStyle: CSSProperties = {
@@ -191,16 +192,16 @@ const footerStyle: CSSProperties = {
   justifyContent: "flex-end",
   gap: 8,
   padding: "12px 16px",
-  borderTop: "1px solid var(--dsw-alias-border-l2, #eee)",
+  borderTop: "1px solid var(--dsw-alias-border-l2)",
 };
 
 const sectionTitleStyle: CSSProperties = { margin: "0 0 8px", fontSize: 13 };
 
-const mutedStyle: CSSProperties = { color: "var(--dsw-alias-fg-muted, #888)", fontSize: 13 };
+const mutedStyle: CSSProperties = { color: "var(--dsw-alias-label-tertiary)", fontSize: 13 };
 
 const errorStyle: CSSProperties = {
   padding: "8px 16px",
-  background: "var(--dsw-alias-danger-fill, #fdecec)",
-  color: "var(--dsw-alias-danger, #c0392b)",
+  background: "var(--dsw-alias-interactive-bg-hover-danger)",
+  color: "var(--dsw-alias-state-error-primary)",
   fontSize: 13,
 };
