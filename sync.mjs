@@ -12,7 +12,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const profile = "C:/Users/<USER>/.dsh/profiles/web/node_modules/dsh-skills-reference";
+const profile =
+  process.env.DSH_PROFILE_DIR ??
+  join(process.env.USERPROFILE, ".dsh", "profiles", "web", "node_modules", "dsh-skills-reference");
 
 /** 同步执行一个子进程；失败即退出。 */
 function run(exec, args) {
