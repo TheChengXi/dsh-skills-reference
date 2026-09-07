@@ -19,8 +19,8 @@ DSH 插件：跨工作区 skill 引用。源工作区拥有 skill，其它工作
 ### 声明文件
 
 ```yaml
-- name: intent-flow
-  path: D:\w_dev\intent-flow
+- name: skill-hub
+  path: D:\workspaces\skill-hub
 ```
 
 `path` 填写**源工作区根目录**（该目录里能直接看到 `.dsh` 文件夹），插件会自动取 `<path>/.dsh/skills`。
@@ -39,7 +39,7 @@ pnpm run sync    # 构建并同步 lib/ 与 package.json 到 DSH profile，之�
 pnpm run test    # 单测
 ```
 
-同步目标路径写死在 `sync.mjs`（默认 `C:\Users\<user>\.dsh\profiles\web\node_modules\dsh-skills-reference`）。
+同步插件到当前用户的 DSH profile（目标目录由 `sync.mjs` 按用户主目录解析，可用环境变量 `DSH_PROFILE_DIR` 覆盖）。
 
 ## 测试
 
