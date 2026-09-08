@@ -1,14 +1,16 @@
 /**
  * @intent
  * client 半装配入口：挂载 locale、$mount skillReference remote（手动，因 out-of-tree 插件不在 dsh-api-remotes 的硬编码列表）、
- * 创建共享 controller（注入 remote/skillsApi/sessions/pickDirectory），并把它通过 inject 下发到 sidebar.footer.action 入口按钮与
+ * 创建共享 controller（注入 remote/sessions/pickDirectory），并把它通过 inject 下发到 sidebar.footer.action 入口按钮与
  * shell.overlay 面板两个 slot。
  *
  * 边界：`ctx.remote.$mount` 是 async，apply 因此为 async；namespace service 在 $mount 后经 `ctx.get("remote.skillReference")` 取得；
- * 两处 slot 的 Component 只依赖 inject 下发的 { controller, t }，不依赖 slot 上下文。
+ * controller 不再依赖 connection.api.skills（预览改走 skillReference.inspect），pickDirectory 复用 workspaces.pickDirectory
+ * 既用于选目标工作区也用于选源目录；两处 slot 的 Component 只依赖 inject 下发的 { controller, t }。
  *
  * 验收条件：
- * - apply 后 remote.skillReference.list/replace 可用（namespace service 已安装）
+ * - apply 后 remote.skillReference.list/replace/inspect 可用（namespace service 已安装）
+ * - controller 注入的 remote 含 inspect、sessions 提供初始 targetPath（cwd）、pickDirectory 复用 workspaces
  * - sidebar.footer.action 与 shell.overlay 各注册一次，注入同一 controller 实例
  */
 import { TYPERT_REMOTE } from "./typert-remote";
@@ -22,7 +24,10 @@ const zh = {
   "panel.title": "skill 引用声明",
   "panel.close": "关闭",
   "panel.loading": "载入中…",
+  "panel.target": "目标工作区",
+  "panel.targetPlaceholder": "被管理工作区根路径",
   "panel.references": "引用声明",
+  "panel.health": "引用源状态",
   "panel.add": "添加引用",
   "panel.remove": "移除",
   "panel.name": "名称",
@@ -31,6 +36,10 @@ const zh = {
   "panel.preview": "已生效 skill 预览",
   "panel.previewEmpty": "（无）",
   "panel.empty": "尚未声明任何引用源",
+  "panel.local": "本地",
+  "panel.statusOk": "生效",
+  "panel.statusEmpty": "空源",
+  "panel.statusInvalid": "未生效",
   "panel.save": "保存并应用",
   "panel.cancel": "取消",
 };
@@ -40,7 +49,10 @@ const en: Record<string, string> = {
   "panel.title": "skill reference declarations",
   "panel.close": "Close",
   "panel.loading": "Loading…",
+  "panel.target": "Target workspace",
+  "panel.targetPlaceholder": "Workspace root to manage",
   "panel.references": "Reference declarations",
+  "panel.health": "Reference source status",
   "panel.add": "Add reference",
   "panel.remove": "Remove",
   "panel.name": "Name",
@@ -49,11 +61,15 @@ const en: Record<string, string> = {
   "panel.preview": "Effective skill preview",
   "panel.previewEmpty": "(none)",
   "panel.empty": "No reference source declared yet",
+  "panel.local": "local",
+  "panel.statusOk": "active",
+  "panel.statusEmpty": "empty",
+  "panel.statusInvalid": "unavailable",
   "panel.save": "Save & apply",
   "panel.cancel": "Cancel",
 };
 
-export const inject = ["remote", "slots", "locale", "sessions", "connection", "workspaces"];
+export const inject = ["remote", "slots", "locale", "sessions", "workspaces"];
 
 export async function apply(ctx: any): Promise<void> {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "skill-reference: locale");
@@ -63,12 +79,10 @@ export async function apply(ctx: any): Promise<void> {
 
   const t = ctx.locale.bind(NS);
   const sessions = ctx.get("sessions");
-  const api = ctx.get("connection").api;
   const workspaces = ctx.get("workspaces");
 
   const controller = new SkillReferencePanelController({
     remote: refRemote,
-    skillsApi: api.skills,
     sessions,
     pickDirectory: () => workspaces.pickDirectory(),
   });

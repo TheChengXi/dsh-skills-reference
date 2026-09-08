@@ -2,12 +2,13 @@
  * @intent
  * 外层 skill provider：把当前工作区声明的引用源 skills 目录，经官方 FileSystemSkillProvider 发现为候选，并改写候选 rank 为 REFERENCE_SKILL_RANK、provider 为 "skill-reference"，实现「引用源优先」的纯跟随语义。
  *
- * 边界：provider.name 固定 "skill-reference"；声明为空或读失败 → list 返回空数组（空声明是合法空态，读失败降级为空并 warn）；按 cwd 缓存内层实例，list 每次以入参 cwd 读声明比对 sourceDirs（引用源只对当前 cwd 的声明生效，不同 cwd 互不泄漏），变化时重建并 invalidate；get 委托给产生候选的内层实例并把 definition.provider 改回 "skill-reference"。
+ * 边界：provider.name 固定 "skill-reference"；声明为空或读失败 → list 返回空数组（空声明是合法空态，读失败降级为空并 warn）；按 cwd 缓存内层实例，list 每次以入参 cwd 读声明比对 sourceDirs（引用源只对当前 cwd 的声明生效，不同 cwd 互不泄漏），变化时重建并 invalidate；get 委托给产生候选的内层实例并把 definition.provider 改回 "skill-reference"；invalidateFor(cwd) 主动失效指定 cwd 的内层缓存并触发全局 invalidate（供写声明后精准失效）。
  *
  * 验收条件：
  * - 返回候选 rank === REFERENCE_SKILL_RANK 且 provider === "skill-reference"
  * - 空声明返回空数组，不创建内层实例
  * - 声明变化后重建内层实例并触发 invalidate
+ * - invalidateFor(cwd) 只释放/删除该 cwd 的缓存并触发一次全局 invalidate，不影响其他 cwd 缓存
  * - 同一 provider 先 list({cwd:B}) 建引用、再 list({cwd:C 无声明}) 返回空（引用源不跨 cwd 泄漏）
  * - 引用源候选 rank(1) 小于本地 project-dsh(100)
  */
@@ -67,6 +68,11 @@ export class ReferenceSkillProvider implements SkillProvider {
   /** 供外部（RPC 写声明后）主动触发 ctx.skills 失效，使 catalog 重发现；provider 未创建时为 no-op。 */
   invalidate(): void {
     this.invalidateFn?.();
+  }
+
+  /** 主动失效指定 cwd 的内层缓存（dispose + delete）并触发全局 invalidate；供写声明后对该目标路径精准失效。 */
+  async invalidateFor(cwd: string): Promise<void> {
+    await this.onReferencesChanged(resolve(cwd));
   }
 
   async list(options: SkillLookupOptions): Promise<readonly SkillCandidate[] | SkillProviderObservation> {

@@ -6,10 +6,11 @@ import {
   SKILL_REFERENCE_SERVICE,
   referenceEntrySchema,
   skillReferenceResultSchema,
+  inspectResultSchema,
 } from "../src/contract.js";
 
-test("two descriptors under skillReference namespace/service", () => {
-  assert.deepEqual(SKILL_REFERENCE_DESCRIPTORS.map((d) => d.method).sort(), ["list", "replace"]);
+test("three descriptors under skillReference namespace/service", () => {
+  assert.deepEqual(SKILL_REFERENCE_DESCRIPTORS.map((d) => d.method).sort(), ["inspect", "list", "replace"]);
   for (const d of SKILL_REFERENCE_DESCRIPTORS) {
     assert.equal(d.service, SKILL_REFERENCE_SERVICE);
     assert.equal(d.namespace, SKILL_REFERENCE_NAMESPACE);
@@ -29,10 +30,18 @@ test("every parameter and result codec is strict with parse()", () => {
   }
 });
 
-test("replace descriptor carries sessionId then entries in order", () => {
+test("replace descriptor carries targetPath then entries in order", () => {
   const replace = SKILL_REFERENCE_DESCRIPTORS.find((d) => d.method === "replace");
   assert.ok(replace);
-  assert.deepEqual(replace.parameters.map((p) => p.wire), ["sessionId", "entries"]);
+  assert.deepEqual(replace.parameters.map((p) => p.wire), ["targetPath", "entries"]);
+});
+
+test("list and inspect descriptors take single targetPath param", () => {
+  for (const method of ["list", "inspect"]) {
+    const descriptor = SKILL_REFERENCE_DESCRIPTORS.find((d) => d.method === method);
+    assert.ok(descriptor);
+    assert.deepEqual(descriptor.parameters.map((p) => p.wire), ["targetPath"]);
+  }
 });
 
 test("referenceEntrySchema validates shape", () => {
@@ -46,5 +55,24 @@ test("skillReferenceResultSchema accepts entries plus optional error", () => {
   assert.deepEqual(
     skillReferenceResultSchema.parse({ entries: [{ name: "a", path: "b" }], error: "boom" }),
     { entries: [{ name: "a", path: "b" }], error: "boom" },
+  );
+});
+
+test("inspectResultSchema accepts entries with status enum and skills with source", () => {
+  assert.deepEqual(
+    inspectResultSchema.parse({
+      entries: [{ name: "dev", path: "D:/dev", status: "ok" }],
+      skills: [{ name: "alpha", description: "a", modelInvocable: true, source: "dev" }],
+    }),
+    {
+      entries: [{ name: "dev", path: "D:/dev", status: "ok" }],
+      skills: [{ name: "alpha", description: "a", modelInvocable: true, source: "dev" }],
+    },
+  );
+  assert.throws(() =>
+    inspectResultSchema.parse({ entries: [{ name: "dev", path: "D:/dev", status: "bogus" }], skills: [] }),
+  );
+  assert.throws(() =>
+    inspectResultSchema.parse({ entries: [], skills: [{ name: "a", description: "", modelInvocable: true, source: "" }] }),
   );
 });

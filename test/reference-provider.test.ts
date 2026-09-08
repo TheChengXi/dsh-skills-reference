@@ -147,3 +147,35 @@ test("reference source is scoped per cwd and does not leak across workspaces", a
   const backInB = await provider.list({ cwd: "D:/roots/B" });
   assert.equal(backInB.length, 1);
 });
+
+test("invalidateFor releases only that cwd and invalidates once", async () => {
+  let created = 0;
+  let disposed = 0;
+  let invalidated = 0;
+  const provider = new ReferenceSkillProvider({
+    readReferences: async (cwd: string) => (cwd.includes("B") ? [] : [{ name: "x", path: "D:/s" }]),
+    resolveSourceDir: (entry) => `${entry.path}/.dsh/skills`,
+    createInner: () => {
+      created++;
+      return inner({
+        dispose: async () => {
+          disposed++;
+        },
+      });
+    },
+  });
+  provider.setInvalidate(() => {
+    invalidated++;
+  });
+
+  await provider.list({ cwd: "D:/roots/A" });
+  await provider.list({ cwd: "D:/roots/B" });
+  assert.equal(created, 1);
+
+  await provider.invalidateFor("D:/roots/A");
+  assert.equal(disposed, 1);
+  assert.equal(invalidated, 1);
+
+  await provider.list({ cwd: "D:/roots/A" });
+  assert.equal(created, 2);
+});

@@ -4,12 +4,13 @@
  * 供 index.ts 调 ctx.typert.register 注册，从而使 client 端能 $mount 同名 remote namespace。
  *
  * 边界：schemas 留空（schema 已内联在 descriptor codec 上，与官方 dsh-goal 一致）；model 只给最小
- * reflection 元数据（一个 service、两个 method 成员），registry validatePackage 不深校验 model 内容；
+ * reflection 元数据（一个 service、三个 method 成员 list/replace/inspect），registry validatePackage 不深校验 model 内容；
  * package 用本包名，face 固定 host。
  *
  * 验收条件：
  * - TYPERT.invocations 与 SKILL_REFERENCE_DESCRIPTORS 为同一引用
  * - TYPERT.package === "dsh-skills-reference"、face === "host"、schemas 为空数组
+ * - model.services 唯一 service 的 members 含 list/replace/inspect
  */
 import { SKILL_REFERENCE_DESCRIPTORS } from "./contract.js";
 
@@ -44,12 +45,17 @@ export const TYPERT: TypertContributionLike = {
           {
             kind: "method",
             name: "list",
-            signature: "list(sessionId: string): Promise<SkillReferenceResult>",
+            signature: "list(targetPath: string): Promise<SkillReferenceResult>",
           },
           {
             kind: "method",
             name: "replace",
-            signature: "replace(sessionId: string, entries: ReferenceEntry[]): Promise<SkillReferenceResult>",
+            signature: "replace(targetPath: string, entries: ReferenceEntry[]): Promise<SkillReferenceResult>",
+          },
+          {
+            kind: "method",
+            name: "inspect",
+            signature: "inspect(targetPath: string): Promise<SkillInspectResult>",
           },
         ],
         types: [],
