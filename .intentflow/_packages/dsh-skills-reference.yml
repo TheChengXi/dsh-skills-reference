@@ -6,13 +6,15 @@ summary: |
 
 groups:
   - name: 宿主数据与 skill 发现
-    summary: 声明文件从 schema 到 skill provider 的完整宿主链路——声明 YAML 解析/序列化、读写存取、包装官方
-      FileSystemSkillProvider 为「引用源优先」的 skill 来源，随目录/声明变化失效重发现。
+    summary: 声明文件从 schema 到 skill provider 的完整宿主链路——声明 YAML 解析/序列化、读写存取、声明文件目录级
+      可靠监测（reference-watch）、包装官方 FileSystemSkillProvider 为「引用源优先」的 skill 来源，随目录/声明变化失效重发现。
     files:
       - test/reference-provider.test.ts
+      - test/reference-watch.test.ts
       - test/references-store.test.ts
       - test/schema.test.ts
       - src/reference-provider.ts
+      - src/reference-watch.ts
       - src/references-store.ts
       - src/schema.ts
 

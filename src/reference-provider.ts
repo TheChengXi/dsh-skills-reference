@@ -2,12 +2,13 @@
  * @intent
  * 外层 skill provider：把当前工作区声明的引用源 skills 目录，经官方 FileSystemSkillProvider 发现为候选，并改写候选 rank 为 REFERENCE_SKILL_RANK、provider 为 "skill-reference"，实现「引用源优先」的纯跟随语义。
  *
- * 边界：provider.name 固定 "skill-reference"；声明为空或读失败 → list 返回空数组（空声明是合法空态，读失败降级为空并 warn）；按 cwd 缓存内层实例，声明变化时重建并 invalidate；get 委托给产生候选的内层实例并把 definition.provider 改回 "skill-reference"。
+ * 边界：provider.name 固定 "skill-reference"；声明为空或读失败 → list 返回空数组（空声明是合法空态，读失败降级为空并 warn）；按 cwd 缓存内层实例，list 每次以入参 cwd 读声明比对 sourceDirs（引用源只对当前 cwd 的声明生效，不同 cwd 互不泄漏），变化时重建并 invalidate；get 委托给产生候选的内层实例并把 definition.provider 改回 "skill-reference"。
  *
  * 验收条件：
  * - 返回候选 rank === REFERENCE_SKILL_RANK 且 provider === "skill-reference"
  * - 空声明返回空数组，不创建内层实例
  * - 声明变化后重建内层实例并触发 invalidate
+ * - 同一 provider 先 list({cwd:B}) 建引用、再 list({cwd:C 无声明}) 返回空（引用源不跨 cwd 泄漏）
  * - 引用源候选 rank(1) 小于本地 project-dsh(100)
  */
 import type {

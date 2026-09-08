@@ -119,3 +119,31 @@ test("dispose releases inners and watchers", async () => {
   assert.equal(disposed, 1);
   assert.equal(unwatched, 1);
 });
+
+test("reference source is scoped per cwd and does not leak across workspaces", async () => {
+  const builtFor: string[] = [];
+  const provider = new ReferenceSkillProvider({
+    readReferences: async (cwd: string) =>
+      cwd.includes("B") ? [{ name: "dev", path: "D:/a" }] : [],
+    resolveSourceDir: (entry) => `${entry.path}/.dsh/skills`,
+    createInner: (sourceDirs) => {
+      builtFor.push(sourceDirs[0]);
+      return inner({ list: async () => [candidate()] });
+    },
+  });
+
+  // B 声明了引用源 → 发现 alpha
+  const inB = await provider.list({ cwd: "D:/roots/B" });
+  assert.equal(inB.length, 1);
+  assert.equal(inB[0].name, "alpha");
+  assert.deepEqual(builtFor, ["D:/a/.dsh/skills"]);
+
+  // C 无声明 → 返回空，且不新建内层实例（不泄露 B 的引用源）
+  const inC = await provider.list({ cwd: "D:/roots/C" });
+  assert.deepEqual(inC, []);
+  assert.equal(builtFor.length, 1);
+
+  // 回切 B → 引用源的 skill 重新可见
+  const backInB = await provider.list({ cwd: "D:/roots/B" });
+  assert.equal(backInB.length, 1);
+});
