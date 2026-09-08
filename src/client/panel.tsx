@@ -23,7 +23,7 @@ export interface PanelComponentProps {
   t: (key: string) => string;
 }
 
-const entryLabelStyle: CSSProperties = {
+const entryRowStyle: CSSProperties = {
   display: "flex",
   gap: 8,
   alignItems: "center",
@@ -62,8 +62,8 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
     <div style={backdropStyle}>
       <div style={cardStyle} data-skill-reference="panel">
         <header style={headerStyle}>
-          <strong>{t("panel.title")}</strong>
-          <button type="button" style={buttonStyle} onClick={() => controller.close()}>
+          <strong style={panelTitleStyle}>{t("panel.title")}</strong>
+          <button type="button" style={closeButtonStyle} onClick={() => controller.close()}>
             {t("panel.close")}
           </button>
         </header>
@@ -74,59 +74,65 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
           <div style={{ padding: 16 }}>{t("panel.loading")}</div>
         ) : (
           <div style={{ padding: 16, overflowY: "auto" }}>
+            {/* 1. 目标工作区：标签 + 占满宽度输入 + 右侧「选择目录」辅助按钮 */}
             <section>
               <h4 style={sectionTitleStyle}>{t("panel.target")}</h4>
-              <div style={entryLabelStyle}>
+              <div style={entryRowStyle}>
                 <input
                   style={{ ...inputStyle, flex: "1 1 auto" }}
                   value={state.targetPath ?? ""}
                   placeholder={t("panel.targetPlaceholder")}
                   onChange={(event) => controller.setTargetPath(event.target.value)}
                 />
-                <button type="button" style={buttonStyle} onClick={() => void controller.pickTargetPath()}>
+                <button type="button" style={compactButtonStyle} onClick={() => void controller.pickTargetPath()}>
                   {t("panel.browse")}
                 </button>
               </div>
             </section>
 
+            {/* 2. 引用声明区：整组收进卡片容器，作为完整配置单元 */}
             <section style={{ marginTop: 16 }}>
               <h4 style={sectionTitleStyle}>{t("panel.references")}</h4>
-              {state.entries.length === 0 ? (
-                <div style={mutedStyle}>{t("panel.empty")}</div>
-              ) : (
-                state.entries.map((entry, index) => (
-                  <div key={index} style={entryLabelStyle}>
-                    <input
-                      style={{ ...inputStyle, flex: "1 1 30%" }}
-                      value={entry.name}
-                      placeholder={t("panel.name")}
-                      onChange={(event) => controller.updateEntry(index, { name: event.target.value })}
-                    />
-                    <input
-                      style={{ ...inputStyle, flex: "2 1 auto" }}
-                      value={entry.path}
-                      placeholder={t("panel.path")}
-                      onChange={(event) => controller.updateEntry(index, { path: event.target.value })}
-                    />
-                    <button type="button" style={buttonStyle} onClick={() => void controller.pickEntryPath(index)}>
-                      {t("panel.browse")}
-                    </button>
-                    <button type="button" style={buttonStyle} onClick={() => controller.removeEntry(index)}>
-                      {t("panel.remove")}
-                    </button>
-                  </div>
-                ))
-              )}
-              <button type="button" style={buttonStyle} onClick={() => controller.addEntry()}>
-                {t("panel.add")}
-              </button>
+              <div style={cardBoxStyle}>
+                {state.entries.length === 0 ? (
+                  <div style={mutedStyle}>{t("panel.empty")}</div>
+                ) : (
+                  state.entries.map((entry, index) => (
+                    <div key={index} style={entryRowStyle}>
+                      <input
+                        style={{ ...inputStyle, flex: "1 1 30%" }}
+                        value={entry.name}
+                        placeholder={t("panel.name")}
+                        onChange={(event) => controller.updateEntry(index, { name: event.target.value })}
+                      />
+                      <input
+                        style={{ ...inputStyle, flex: "2 1 auto" }}
+                        value={entry.path}
+                        placeholder={t("panel.path")}
+                        onChange={(event) => controller.updateEntry(index, { path: event.target.value })}
+                      />
+                      <button type="button" style={compactButtonStyle} onClick={() => void controller.pickEntryPath(index)}>
+                        {t("panel.browse")}
+                      </button>
+                      <button type="button" style={compactButtonStyle} onClick={() => controller.removeEntry(index)}>
+                        {t("panel.remove")}
+                      </button>
+                    </div>
+                  ))
+                )}
+                <div style={{ marginTop: 8 }}>
+                  <button type="button" style={buttonStyle} onClick={() => controller.addEntry()}>
+                    {t("panel.add")}
+                  </button>
+                </div>
+              </div>
             </section>
 
             {state.health.length > 0 ? (
               <section style={{ marginTop: 16 }}>
                 <h4 style={sectionTitleStyle}>{t("panel.health")}</h4>
                 {state.health.map((entry, index) => (
-                  <div key={index} style={entryLabelStyle}>
+                  <div key={index} style={entryRowStyle}>
                     <code>{entry.name}</code>
                     <span style={statusStyle(entry.status)}>{statusLabel(entry.status, t)}</span>
                   </div>
@@ -134,41 +140,54 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
               </section>
             ) : null}
 
+            {/* 3. 预览区：独立结果卡片，顶部标题 + 详情 + 底部关键词 tag */}
             <section style={{ marginTop: 16 }}>
               <h4 style={sectionTitleStyle}>{t("panel.preview")}</h4>
-              {state.skills.length === 0 ? (
-                <div style={mutedStyle}>{t("panel.previewEmpty")}</div>
-              ) : (
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {state.skills.map((skill) => (
-                    <li key={skill.name} style={{ marginBottom: 4 }}>
-                      <code>{skill.name}</code>
-                      {skill.description ? ` — ${skill.description}` : ""}
-                      <span style={sourceStyle}> · {skill.source === "local" ? t("panel.local") : skill.source}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div style={previewCardStyle}>
+                {state.skills.length === 0 ? (
+                  <div style={mutedStyle}>{t("panel.previewEmpty")}</div>
+                ) : (
+                  <>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {state.skills.map((skill) => (
+                        <li key={skill.name} style={{ marginBottom: 4 }}>
+                          <code>{skill.name}</code>
+                          {skill.description ? ` — ${skill.description}` : ""}
+                          <span style={sourceStyle}> · {skill.source === "local" ? t("panel.local") : skill.source}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div style={tagRowStyle}>
+                      {state.skills.map((skill) => (
+                        <span key={skill.name} style={tagStyle}>
+                          {skill.name}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </section>
           </div>
         )}
 
+        {/* 4. 底部操作区：主按钮「保存并应用」置于最右并加权重，次按钮「取消」弱化 */}
         <footer style={footerStyle}>
           <button
             type="button"
-            style={{ ...buttonStyle, opacity: dirty && !busy ? 1 : 0.5 }}
-            disabled={!dirty || busy}
-            onClick={() => void controller.save()}
-          >
-            {t("panel.save")}
-          </button>
-          <button
-            type="button"
-            style={{ ...buttonStyle, opacity: dirty && !busy ? 1 : 0.5 }}
+            style={{ ...secondaryButtonStyle, opacity: dirty && !busy ? 1 : 0.5 }}
             disabled={!dirty || busy}
             onClick={() => controller.reset()}
           >
             {t("panel.cancel")}
+          </button>
+          <button
+            type="button"
+            style={{ ...primaryButtonStyle, opacity: dirty && !busy ? 1 : 0.5 }}
+            disabled={!dirty || busy}
+            onClick={() => void controller.save()}
+          >
+            {t("panel.save")}
           </button>
         </footer>
       </div>
@@ -208,6 +227,41 @@ const buttonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+// 输入区右侧的辅助按钮：尺寸略小，视觉上让位于输入框
+const compactButtonStyle: CSSProperties = {
+  padding: "4px 10px",
+  borderRadius: 6,
+  border: "1px solid var(--dsw-alias-border-l1)",
+  background: "var(--dsw-alias-button-secondary-fill)",
+  color: "var(--dsw-alias-label-primary)",
+  fontSize: 12,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+// 底部操作区主按钮：采用系统主色按钮 token，深浅主题自动适配亮度
+const primaryButtonStyle: CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 6,
+  border: "none",
+  background: "var(--dsw-alias-button-primary-fill)",
+  color: "var(--dsw-alias-label-primary-foreground)",
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+// 底部操作区次按钮：仅弱化背景，仍保留边框轮廓
+const secondaryButtonStyle: CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 6,
+  border: "1px solid var(--dsw-alias-border-l2)",
+  background: "transparent",
+  color: "var(--dsw-alias-label-secondary)",
+  fontSize: 13,
+  cursor: "pointer",
+};
+
 const backdropStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -236,8 +290,23 @@ const headerStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  padding: "12px 16px",
+  padding: "14px 16px",
   borderBottom: "1px solid var(--dsw-alias-border-l2)",
+};
+
+const panelTitleStyle: CSSProperties = {
+  fontSize: 16,
+  fontWeight: 600,
+};
+
+const closeButtonStyle: CSSProperties = {
+  padding: "4px 10px",
+  borderRadius: 6,
+  border: "1px solid var(--dsw-alias-border-l1)",
+  background: "transparent",
+  color: "var(--dsw-alias-label-secondary)",
+  fontSize: 13,
+  cursor: "pointer",
 };
 
 const footerStyle: CSSProperties = {
@@ -248,7 +317,39 @@ const footerStyle: CSSProperties = {
   borderTop: "1px solid var(--dsw-alias-border-l2)",
 };
 
-const sectionTitleStyle: CSSProperties = { margin: "0 0 8px", fontSize: 13 };
+const sectionTitleStyle: CSSProperties = { margin: "0 0 8px", fontSize: 13, fontWeight: 600 };
+
+// 配置单元容器：引用声明/预览共用，区分于外层内容区
+const cardBoxStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid var(--dsw-alias-border-l2)",
+  background: "var(--dsw-alias-bg-layer-3)",
+};
+
+const previewCardStyle: CSSProperties = {
+  padding: 12,
+  borderRadius: 10,
+  border: "1px solid var(--dsw-alias-border-l2)",
+  background: "var(--dsw-alias-bg-layer-3)",
+};
+
+const tagRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  marginTop: 10,
+  paddingTop: 10,
+  borderTop: "1px solid var(--dsw-alias-border-l1)",
+};
+
+const tagStyle: CSSProperties = {
+  fontSize: 12,
+  color: "var(--dsw-alias-label-secondary)",
+  border: "1px solid var(--dsw-alias-border-l1)",
+  borderRadius: 999,
+  padding: "1px 8px",
+};
 
 const mutedStyle: CSSProperties = { color: "var(--dsw-alias-label-tertiary)", fontSize: 13 };
 
