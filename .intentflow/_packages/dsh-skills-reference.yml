@@ -35,7 +35,7 @@ groups:
 
   - name: Client 可视化窗口
     summary: Web 半的面板能力——typert remote 装配、面板状态机（载入/编辑/保存/预览）、React 面板与入口按钮组件
-      （入口挂输入框工具行 conversation.input.left，仅选中会话时可及）、client 装配入口，以及产出宿主 client 模块格式的
+      （入口挂输入框工具行 conversation.input.left，仅选中会话时可及）、client 装配入口（目录选择经官方 ui-workspace 服务的 uiWorkspace.pickDirectory，目标工作区与引用源两处共用同一注入点），以及产出宿主 client 模块格式的
       esbuild 构建脚本。面板样式由 DSH 原生语义 token（--dsw-alias-*）驱动、随主题色板（light/dark/system）自动适配深浅，
       不引用自造 token 或硬编码色值。
     files:

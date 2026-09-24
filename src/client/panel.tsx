@@ -12,7 +12,8 @@
  *
  * 验收条件：
  * - open=false 时渲染 null（不占 overlay 布局）
- * - 目标工作区字段显示 state.targetPath，选目录/手填切换回调 controller.setTargetPath
+ * - 目标工作区一行无框外标题：空值时框内由 placeholder 呈现「目标工作区：…」内嵌文案，非空时显示 state.targetPath；
+ *   选目录/手填均回调 controller.setTargetPath
  * - 列表随 state.entries 增删改即时反映；每个 entry 旁显示健康度状态
  * - 预览区每 skill 后显示其 source 标注；保存/取消 disabled 跟随 controller.dirty 与 phase
  * - 入口按钮显示 t("entry.label")、hover 时切换背景色、点击调 controller.open()
@@ -79,9 +80,8 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
           <div style={{ padding: 16 }}>{t("panel.loading")}</div>
         ) : (
           <div style={{ padding: 16, overflowY: "auto" }}>
-            {/* 1. 目标工作区：标签 + 占满宽度输入 + 右侧「选择目录」辅助按钮 */}
+            {/* 1. 目标工作区：文案内嵌 placeholder（无框外标题）+ 占满宽度输入 + 右侧「选择目录」辅助按钮 */}
             <section>
-              <h4 style={sectionTitleStyle}>{t("panel.target")}</h4>
               <div style={entryRowStyle}>
                 <input
                   style={{ ...inputStyle, flex: "1 1 auto" }}

@@ -5,13 +5,14 @@
  * shell.overlay 面板两个 slot。
  *
  * 边界：`ctx.remote.$mount` 是 async，apply 因此为 async；namespace service 在 $mount 后经 `ctx.get("remote.skillReference")` 取得；
- * controller 不再依赖 connection.api.skills（预览改走 skillReference.inspect），pickDirectory 复用 workspaces.pickDirectory
- * 既用于选目标工作区也用于选源目录；两处 slot 的 Component 只依赖 inject 下发的 { controller, t }；conversation.input.left
+ * controller 不再依赖 connection.api.skills（预览改走 skillReference.inspect），pickDirectory 复用官方 ui-workspace 服务的
+ * uiWorkspace.pickDirectory（既用于选目标工作区也用于选源目录），不直连 remote.directoryPicker；两处 slot 的 Component 只依赖
+ * inject 下发的 { controller, t }；conversation.input.left
  * 由 composer bar 声明，只在选中会话时挂载，故入口不做 hero（无会话）态兜底。
  *
  * 验收条件：
  * - apply 后 remote.skillReference.list/replace/inspect 可用（namespace service 已安装）
- * - controller 注入的 remote 含 inspect、sessions 提供初始 targetPath（cwd）、pickDirectory 复用 workspaces
+ * - controller 注入的 remote 含 inspect、sessions 提供初始 targetPath（cwd）、pickDirectory 复用 uiWorkspace
  * - conversation.input.left 与 shell.overlay 各注册一次，注入同一 controller 实例
  * - 面板入口唯一（仅经 conversation.input.left 暴露）、入口文案中英均为 skill
  */
@@ -26,8 +27,7 @@ const zh = {
   "panel.title": "skill 引用声明",
   "panel.close": "关闭",
   "panel.loading": "载入中…",
-  "panel.target": "目标工作区",
-  "panel.targetPlaceholder": "被管理工作区根路径",
+  "panel.targetPlaceholder": "目标工作区：被管理工作区根路径",
   "panel.references": "引用声明",
   "panel.health": "引用源状态",
   "panel.add": "添加引用",
@@ -51,8 +51,7 @@ const en: Record<string, string> = {
   "panel.title": "skill reference declarations",
   "panel.close": "Close",
   "panel.loading": "Loading…",
-  "panel.target": "Target workspace",
-  "panel.targetPlaceholder": "Workspace root to manage",
+  "panel.targetPlaceholder": "Target workspace: Workspace root to manage",
   "panel.references": "Reference declarations",
   "panel.health": "Reference source status",
   "panel.add": "Add reference",
@@ -71,7 +70,7 @@ const en: Record<string, string> = {
   "panel.cancel": "Cancel",
 };
 
-export const inject = ["remote", "slots", "locale", "sessions", "workspaces"];
+export const inject = ["remote", "slots", "locale", "sessions", "uiWorkspace"];
 
 export async function apply(ctx: any): Promise<void> {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), "skill-reference: locale");
@@ -81,12 +80,12 @@ export async function apply(ctx: any): Promise<void> {
 
   const t = ctx.locale.bind(NS);
   const sessions = ctx.get("sessions");
-  const workspaces = ctx.get("workspaces");
+  const uiWorkspace = ctx.get("uiWorkspace");
 
   const controller = new SkillReferencePanelController({
     remote: refRemote,
     sessions,
-    pickDirectory: () => workspaces.pickDirectory(),
+    pickDirectory: () => uiWorkspace.pickDirectory(),
   });
 
   ctx.slots.inject(
