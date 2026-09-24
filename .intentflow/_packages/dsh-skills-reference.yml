@@ -3,7 +3,7 @@ summary: |
   跨工作区 skill 引用插件。宿主半：引用声明（.dsh/skill-references.yml）的数据存取 + 复用官方 dsh-skill-filesystem 的发现
   provider（引用源优先、随声明/目录变化按 cwd 精准失效）+ 只读来源巡检 SourceInspection（逐源健康度 + 逐 skill 来源标注），
   经 Typert 暴露给浏览器的 list/replace/inspect RPC（显式 targetPath 定位，不依赖会话）。Web 半：基于 React 的可视化
-  面板（侧边栏入口 + overlay 窗口），指定任意目标工作区、图形化管理声明并逐源预览已生效 skill。构建：build.mjs（esbuild 产出 lib/client.js）+ tsc。
+  面板（输入框工具行入口 + overlay 窗口），指定任意目标工作区、图形化管理声明并逐源预览已生效 skill。构建：build.mjs（esbuild 产出 lib/client.js）+ tsc。
 
 groups:
   - name: 宿主数据与 skill 发现
@@ -34,9 +34,10 @@ groups:
       - src/index.ts
 
   - name: Client 可视化窗口
-    summary: Web 半的面板能力——typert remote 装配、面板状态机（载入/编辑/保存/预览）、React 面板与入口按钮组件、
-      client 装配入口，以及产出宿主 client 模块格式的 esbuild 构建脚本。面板样式由 DSH 原生语义 token（--dsw-alias-*）
-      驱动、随主题色板（light/dark/system）自动适配深浅，不引用自造 token 或硬编码色值。
+    summary: Web 半的面板能力——typert remote 装配、面板状态机（载入/编辑/保存/预览）、React 面板与入口按钮组件
+      （入口挂输入框工具行 conversation.input.left，仅选中会话时可及）、client 装配入口，以及产出宿主 client 模块格式的
+      esbuild 构建脚本。面板样式由 DSH 原生语义 token（--dsw-alias-*）驱动、随主题色板（light/dark/system）自动适配深浅，
+      不引用自造 token 或硬编码色值。
     files:
       - build.mjs
       - src/client/client.ts

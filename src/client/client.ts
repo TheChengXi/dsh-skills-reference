@@ -1,26 +1,28 @@
 /**
  * @intent
  * client 半装配入口：挂载 locale、$mount skillReference remote（手动，因 out-of-tree 插件不在 dsh-api-remotes 的硬编码列表）、
- * 创建共享 controller（注入 remote/sessions/pickDirectory），并把它通过 inject 下发到 sidebar.footer.action 入口按钮与
+ * 创建共享 controller（注入 remote/sessions/pickDirectory），并把它通过 inject 下发到 conversation.input.left 入口按钮与
  * shell.overlay 面板两个 slot。
  *
  * 边界：`ctx.remote.$mount` 是 async，apply 因此为 async；namespace service 在 $mount 后经 `ctx.get("remote.skillReference")` 取得；
  * controller 不再依赖 connection.api.skills（预览改走 skillReference.inspect），pickDirectory 复用 workspaces.pickDirectory
- * 既用于选目标工作区也用于选源目录；两处 slot 的 Component 只依赖 inject 下发的 { controller, t }。
+ * 既用于选目标工作区也用于选源目录；两处 slot 的 Component 只依赖 inject 下发的 { controller, t }；conversation.input.left
+ * 由 composer bar 声明，只在选中会话时挂载，故入口不做 hero（无会话）态兜底。
  *
  * 验收条件：
  * - apply 后 remote.skillReference.list/replace/inspect 可用（namespace service 已安装）
  * - controller 注入的 remote 含 inspect、sessions 提供初始 targetPath（cwd）、pickDirectory 复用 workspaces
- * - sidebar.footer.action 与 shell.overlay 各注册一次，注入同一 controller 实例
+ * - conversation.input.left 与 shell.overlay 各注册一次，注入同一 controller 实例
+ * - 面板入口唯一（仅经 conversation.input.left 暴露）、入口文案中英均为 skill
  */
 import { TYPERT_REMOTE } from "./typert-remote";
 import { SkillReferencePanelController } from "./controller";
-import { FooterButton, SkillReferencePanel } from "./panel";
+import { ComposerEntryButton, SkillReferencePanel } from "./panel";
 
 const NS = "skill-reference";
 
 const zh = {
-  "entry.label": "skill 引用",
+  "entry.label": "skill",
   "panel.title": "skill 引用声明",
   "panel.close": "关闭",
   "panel.loading": "载入中…",
@@ -45,7 +47,7 @@ const zh = {
 };
 
 const en: Record<string, string> = {
-  "entry.label": "skill references",
+  "entry.label": "skill",
   "panel.title": "skill reference declarations",
   "panel.close": "Close",
   "panel.loading": "Loading…",
@@ -88,16 +90,16 @@ export async function apply(ctx: any): Promise<void> {
   });
 
   ctx.slots.inject(
-    "sidebar.footer.action",
+    "conversation.input.left",
     () =>
       ctx.slots.register(
         {
-          name: "sidebar.footer.action",
+          name: "conversation.input.left",
           id: "skill-reference",
           locale: NS,
           inject: () => ({ controller, t }),
         },
-        FooterButton,
+        ComposerEntryButton,
       ),
   );
 

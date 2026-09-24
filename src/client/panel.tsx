@@ -1,21 +1,23 @@
 /**
  * @intent
- * 面板与入口按钮的 React 组件：FooterButton（sidebar.footer.action 入口）点击后经 controller.open 打开面板；
+ * 面板与入口按钮的 React 组件：ComposerEntryButton（输入框工具行 conversation.input.left 入口）点击后经 controller.open 打开面板；
  * SkillReferencePanel（shell.overlay）用 useSyncExternalStore 订阅 controller 状态，呈现「目标工作区切换（选择/手填）+
  * 声明条目编辑器（增删改 + 选目录）+ 逐源健康度 + 逐 skill 来源预览 + 保存/取消」；错误以状态条呈现。
  * 纯展示 + 回调 controller，不直接触达宿主。文本全部走注入的 t。
  *
  * 边界：不引入 css module；样式以内联方式引用 DSH 原生语义 token（--dsw-alias-*），不另造 token 名、不写死色值兜底，随主题色板
  * （light/dark/system）自动适配深浅；组件只依赖 {controller,t} 两个注入属性，忽略 slot 标准 props；健康度三态
- * （ok/empty/invalid）与来源标注以文本徽标展示，来源值直接展示为源名称或「本地」。
+ * （ok/empty/invalid）与来源标注以文本徽标展示，来源值直接展示为源名称或「本地」；入口按钮按工具行控件尺寸呈现（高 28、圆角 24、
+ * 13px/500、label-secondary 字色），hover 底色由组件内 state 驱动（不注入 style 标签），键盘焦点走浏览器默认 focus ring。
  *
  * 验收条件：
  * - open=false 时渲染 null（不占 overlay 布局）
  * - 目标工作区字段显示 state.targetPath，选目录/手填切换回调 controller.setTargetPath
  * - 列表随 state.entries 增删改即时反映；每个 entry 旁显示健康度状态
  * - 预览区每 skill 后显示其 source 标注；保存/取消 disabled 跟随 controller.dirty 与 phase
+ * - 入口按钮显示 t("entry.label")、hover 时切换背景色、点击调 controller.open()
  */
-import { useSyncExternalStore, type CSSProperties } from "react";
+import { useState, useSyncExternalStore, type CSSProperties } from "react";
 import { SkillReferencePanelController, type InspectEntryWire } from "./controller";
 
 export interface PanelComponentProps {
@@ -39,12 +41,15 @@ const inputStyle: CSSProperties = {
   fontSize: 13,
 };
 
-export function FooterButton({ controller, t }: PanelComponentProps) {
+export function ComposerEntryButton({ controller, t }: PanelComponentProps) {
+  const [hover, setHover] = useState(false);
   return (
     <button
       type="button"
       data-skill-reference="entry"
-      style={buttonStyle}
+      style={hover ? { ...entryButtonStyle, ...entryButtonHoverStyle } : entryButtonStyle}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       onClick={() => controller.open()}
     >
       {t("entry.label")}
@@ -216,6 +221,27 @@ function statusStyle(status: InspectEntryWire["status"]): CSSProperties {
     padding: "1px 8px",
   };
 }
+
+// 输入框工具行入口按钮：尺寸与字色对齐同行权限选择器（PermissionSelect），hover 底色由组件内 state 切换
+const entryButtonStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  height: 28,
+  padding: "0 8px",
+  borderRadius: 24,
+  border: "none",
+  background: "transparent",
+  color: "var(--dsw-alias-label-secondary)",
+  fontSize: 13,
+  fontWeight: 500,
+  lineHeight: "20px",
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+};
+
+const entryButtonHoverStyle: CSSProperties = {
+  background: "var(--dsw-alias-interactive-bg-hover)",
+};
 
 const buttonStyle: CSSProperties = {
   padding: "6px 12px",
