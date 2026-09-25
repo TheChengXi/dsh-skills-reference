@@ -1,14 +1,19 @@
 /**
  * @intent
- * 定义跨工作区引用声明（.dsh/skill-references.yml）的数据形状、YAML 序列化与校验，并把每条声明里的工作区路径解析为源 skills 目录绝对路径。
+ * 定义跨工作区引用声明（.dsh/skill-references.yml）的数据形状、YAML 序列化与校验，把每条声明里的工作区路径解析为源 skills
+ * 目录绝对路径，并给出「该声明是否允许某 skill 生效」的唯一判定。
  *
- * 边界：文件顶层必须是数组；每项 name/path 为非空字符串，否则抛错；path 支持 `~` 展开；resolveSourceDir 结果统一 join `.dsh/skills` 且经 path.resolve 规范化为绝对路径。
+ * 边界：文件顶层必须是数组；每项 name/path 为非空字符串，否则抛错；可选 skills 若存在必须是元素非空的字符串数组，否则抛错，
+ * 空数组与缺省同义；path 支持 `~` 展开；resolveSourceDir 结果统一 join `.dsh/skills` 且经 path.resolve 规范化为绝对路径；
+ * isSkillAllowed 是白名单语义的单一实现，reference-provider（真实生效）与 source-inspection（面板展示）共用它，
+ * 以免两侧判定漂移出「面板显示已关闭、模型仍能加载」的错位。
  *
  * 验收条件：
- * - parseReferences 解析合法数组得到等长 ReferenceEntry[]
- * - 缺 name/path 或非字符串时抛 TypeError
- * - parseReferences(serializeReferences(entries)) 往返结果与 entries 相等
+ * - parseReferences 解析合法数组得到等长 ReferenceEntry[]，含 skills 时原样保留
+ * - 缺 name/path、skills 非数组或含空字符串时抛 TypeError
+ * - parseReferences(serializeReferences(entries)) 往返结果与 entries 相等（含 skills）
  * - resolveSourceDir 对 "D:/dev/a" 得到 "D:/dev/a/.dsh/skills"（平台规范化后）
+ * - isSkillAllowed 在 skills 缺省或空数组时恒为 true，否则仅当包含该名时为 true
  */
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { homedir } from "node:os";
@@ -20,10 +25,16 @@ export const REFERENCE_SKILL_RANK = 1;
 /** 引用声明文件名，固定放在工作区根 `.dsh/` 下。 */
 export const REFERENCES_FILENAME = "skill-references.yml";
 
-/** 引用声明文件里的一条：「展示名 + 源工作区根路径」。 */
+/** 引用声明文件里的一条：「展示名 + 源工作区根路径 + 可选 skill 白名单（缺省或空数组 = 该源全部生效）」。 */
 export interface ReferenceEntry {
   name: string;
   path: string;
+  skills?: string[];
+}
+
+/** 判断候选值是否为「元素非空的字符串数组」，用于收窄 skills 的类型而不是断言。 */
+function isSkillNameList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string" && item.length > 0);
 }
 
 function assertEntry(value: unknown, index: number): ReferenceEntry {
@@ -39,7 +50,12 @@ function assertEntry(value: unknown, index: number): ReferenceEntry {
   if (typeof record.path !== "string" || record.path.length === 0) {
     throw new TypeError(`skill-references[${index}].path must be a non-empty string`);
   }
-  return { name: record.name, path: record.path };
+  const skills = record.skills;
+  if (skills === undefined) return { name: record.name, path: record.path };
+  if (!isSkillNameList(skills)) {
+    throw new TypeError(`skill-references[${index}].skills must be an array of non-empty strings`);
+  }
+  return { name: record.name, path: record.path, skills };
 }
 
 /** 把 YAML 文本解析为引用条目列表；空文本返回空数组，非数组顶层或字段非法抛错。 */
@@ -66,4 +82,14 @@ export function resolveSourceDir(entry: ReferenceEntry, home: string = homedir()
       ? join(home, raw.slice(2))
       : raw;
   return resolve(join(expanded, ".dsh", "skills"));
+}
+
+/**
+ * 该条声明是否允许某个 skill 生效：skills 缺省或空数组 = 该源全部生效，否则仅当清单包含该名时生效。
+ * 白名单语义的唯一实现——发现链（reference-provider）与巡检（source-inspection）共用它，避免两侧判定漂移。
+ */
+export function isSkillAllowed(entry: ReferenceEntry, skillName: string): boolean {
+  const allowed = entry.skills;
+  if (allowed === undefined || allowed.length === 0) return true;
+  return allowed.includes(skillName);
 }

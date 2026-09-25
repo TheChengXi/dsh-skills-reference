@@ -4,6 +4,7 @@ import {
   parseReferences,
   serializeReferences,
   resolveSourceDir,
+  isSkillAllowed,
   REFERENCE_SKILL_RANK,
 } from "../src/schema.js";
 
@@ -50,4 +51,45 @@ test("resolveSourceDir joins .dsh/skills and normalizes", () => {
 test("resolveSourceDir expands leading ~", () => {
   const result = resolveSourceDir({ name: "dev", path: "~/skills" }, "C:/Users/tester");
   assert.equal(result, "C:\\Users\\tester\\skills\\.dsh\\skills");
+});
+
+test("parseReferences keeps skills whitelist and round-trips it", () => {
+  const entries = parseReferences(
+    "- name: dev\n  path: D:/dev/skill-dev\n  skills:\n    - alpha\n    - beta\n",
+  );
+  assert.deepEqual(entries, [
+    { name: "dev", path: "D:/dev/skill-dev", skills: ["alpha", "beta"] },
+  ]);
+  assert.deepEqual(parseReferences(serializeReferences(entries)), entries);
+});
+
+test("parseReferences omits skills when absent and accepts an empty list", () => {
+  assert.deepEqual(parseReferences("- name: dev\n  path: D:/dev\n"), [
+    { name: "dev", path: "D:/dev" },
+  ]);
+  assert.deepEqual(parseReferences("- name: dev\n  path: D:/dev\n  skills: []\n"), [
+    { name: "dev", path: "D:/dev", skills: [] },
+  ]);
+});
+
+test("parseReferences rejects malformed skills", () => {
+  assert.throws(
+    () => parseReferences("- name: dev\n  path: D:/dev\n  skills: alpha\n"),
+    /skills must be an array of non-empty strings/,
+  );
+  assert.throws(
+    () => parseReferences("- name: dev\n  path: D:/dev\n  skills:\n    - ''\n"),
+    /skills must be an array of non-empty strings/,
+  );
+  assert.throws(
+    () => parseReferences("- name: dev\n  path: D:/dev\n  skills:\n    - 7\n"),
+    /skills must be an array of non-empty strings/,
+  );
+});
+
+test("isSkillAllowed treats absent or empty skills as all allowed", () => {
+  assert.equal(isSkillAllowed({ name: "dev", path: "D:/dev" }, "alpha"), true);
+  assert.equal(isSkillAllowed({ name: "dev", path: "D:/dev", skills: [] }, "alpha"), true);
+  assert.equal(isSkillAllowed({ name: "dev", path: "D:/dev", skills: ["alpha"] }, "alpha"), true);
+  assert.equal(isSkillAllowed({ name: "dev", path: "D:/dev", skills: ["alpha"] }, "beta"), false);
 });

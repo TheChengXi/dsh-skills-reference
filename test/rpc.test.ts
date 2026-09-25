@@ -48,6 +48,18 @@ test("replace writes entries and invalidates with targetPath once", async () => 
   }
 });
 
+test("replace round-trips a skills whitelist", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "skill-ref-rpc-"));
+  try {
+    const service = new SkillReferenceService(makeCtx(), { invalidate: () => {}, inspect: makeInspect() });
+    const entries = [{ name: "dev", path: "D:/dev/skill-dev", skills: ["alpha"] }];
+    assert.deepEqual(await service.replace(dir, entries), { entries });
+    assert.deepEqual(await readReferences(dir), entries);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("list returns error when targetPath is empty", async () => {
   const service = new SkillReferenceService(makeCtx(), { invalidate: () => {}, inspect: makeInspect() });
   assert.deepEqual(await service.list(""), {
@@ -79,7 +91,16 @@ test("inspect delegates to injected inspection and passes targetPath", async () 
       received = targetPath;
       return {
         entries: [{ name: "dev", path: "D:/dev", status: "ok" as const }],
-        skills: [{ name: "alpha", description: "a", modelInvocable: true, source: "dev" }],
+        skills: [
+          {
+            name: "alpha",
+            description: "a",
+            modelInvocable: true,
+            source: "dev",
+            enabled: true,
+            entryPath: "D:/dev",
+          },
+        ],
       };
     },
   });

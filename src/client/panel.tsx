@@ -2,24 +2,32 @@
  * @intent
  * 面板与入口按钮的 React 组件：ComposerEntryButton（输入框工具行 conversation.input.left 入口）点击后经 controller.open 打开面板；
  * SkillReferencePanel（shell.overlay）用 useSyncExternalStore 订阅 controller 状态，呈现「目标工作区切换（选择/手填）+
- * 声明条目编辑器（增删改 + 选目录）+ 逐源健康度 + 逐 skill 来源预览 + 保存/取消」；错误以状态条呈现。
- * 纯展示 + 回调 controller，不直接触达宿主。文本全部走注入的 t。
+ * 声明条目编辑器（增删改 + 选目录）+ 逐源健康度 + 逐 skill 预览卡片（来源标签前置 + 描述两行省略 + 右侧启停开关）+
+ * 保存/取消」；错误以状态条呈现。纯展示 + 回调 controller，不直接触达宿主。文本全部走注入的 t。
  *
  * 边界：不引入 css module；样式以内联方式引用 DSH 原生语义 token（--dsw-alias-*），不另造 token 名、不写死色值兜底，随主题色板
  * （light/dark/system）自动适配深浅；组件只依赖 {controller,t} 两个注入属性，忽略 slot 标准 props；健康度三态
  * （ok/empty/invalid）与来源标注以文本徽标展示，来源值直接展示为源名称或「本地」；入口按钮按工具行控件尺寸呈现（高 28、圆角 24、
- * 13px/500、label-secondary 字色），hover 底色由组件内 state 驱动（不注入 style 标签），键盘焦点走浏览器默认 focus ring。
+ * 13px/500、label-secondary 字色），hover 底色由组件内 state 驱动（不注入 style 标签），键盘焦点走浏览器默认 focus ring；
+ * 表面层级为「面板 bg-base → 配置单元容器 bg-layer-1 → skill 卡片 bg-module-platform」，卡片刻意不沿用 layer 序号——浅色色板下
+ * bg-layer-1/2/3 与 bg-base 同为纯白，只有 bg-module-platform 在两色板下都有层级差（浅 #f5f6f7 / 深 #353638）；
+ * 启停开关（SkillSwitch）按官方 Switch 规格复刻（button[role=switch][aria-checked] + thumb span，36×20、radius 10，
+ * 关态 border-l3、开态 brand-primary、thumb label-primary-foreground），本地 skill 无开关；启用态取自 controller.isSkillEnabled
+ * （由编辑态白名单派生，点击即变、取消即回滚），停用项不动卡片底色、不设透明度，只把名称与描述取 label-dimmed
+ * （卡片仍保留在列表中可见）。
  *
  * 验收条件：
  * - open=false 时渲染 null（不占 overlay 布局）
  * - 目标工作区一行无框外标题：空值时框内由 placeholder 呈现「目标工作区：…」内嵌文案，非空时显示 state.targetPath；
  *   选目录/手填均回调 controller.setTargetPath
  * - 列表随 state.entries 增删改即时反映；每个 entry 旁显示健康度状态
- * - 预览区每 skill 后显示其 source 标注；保存/取消 disabled 跟随 controller.dirty 与 phase
+ * - 预览区每 skill 渲染为一张卡片：来源标签在最左、名称居中、带 entryPath 的卡片右侧是启停开关；描述限两行超出省略；
+ *   停用项的名称与描述取 label-dimmed；不再渲染重复罗列 skill 名的 tag 行
+ * - 保存/取消 disabled 跟随 controller.dirty 与 phase
  * - 入口按钮显示 t("entry.label")、hover 时切换背景色、点击调 controller.open()
  */
 import { useState, useSyncExternalStore, type CSSProperties } from "react";
-import { SkillReferencePanelController, type InspectEntryWire } from "./controller";
+import { SkillReferencePanelController, type InspectEntryWire, type InspectSkillWire } from "./controller";
 
 export interface PanelComponentProps {
   controller: SkillReferencePanelController;
@@ -145,31 +153,28 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
               </section>
             ) : null}
 
-            {/* 3. 预览区：独立结果卡片，顶部标题 + 详情 + 底部关键词 tag */}
+            {/* 3. 预览区：逐 skill 卡片——来源标签前置、名称、右侧启停开关、描述限两行 */}
             <section style={{ marginTop: 16 }}>
               <h4 style={sectionTitleStyle}>{t("panel.preview")}</h4>
               <div style={previewCardStyle}>
                 {state.skills.length === 0 ? (
                   <div style={mutedStyle}>{t("panel.previewEmpty")}</div>
                 ) : (
-                  <>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {state.skills.map((skill) => (
-                        <li key={skill.name} style={{ marginBottom: 4 }}>
-                          <code>{skill.name}</code>
-                          {skill.description ? ` — ${skill.description}` : ""}
-                          <span style={sourceStyle}> · {skill.source === "local" ? t("panel.local") : skill.source}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div style={tagRowStyle}>
-                      {state.skills.map((skill) => (
-                        <span key={skill.name} style={tagStyle}>
-                          {skill.name}
-                        </span>
-                      ))}
-                    </div>
-                  </>
+                  <div style={skillListStyle}>
+                    {state.skills.map((skill) => (
+                      <SkillPreviewCard
+                        key={`${skill.entryPath ?? "local"}:${skill.name}`}
+                        skill={skill}
+                        enabled={controller.isSkillEnabled(skill)}
+                        localLabel={t("panel.local")}
+                        onToggle={() => {
+                          if (skill.entryPath !== undefined) {
+                            controller.toggleSkill(skill.entryPath, skill.name);
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </section>
@@ -197,6 +202,60 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
         </footer>
       </div>
     </div>
+  );
+}
+
+/** 单个 skill 的预览卡片：来源标签前置、名称、可选启停开关（仅引用源 skill 有）；启用态由 controller 从编辑态派生，停用项仅文本取 label-dimmed。 */
+function SkillPreviewCard({
+  skill,
+  enabled,
+  localLabel,
+  onToggle,
+}: {
+  skill: InspectSkillWire;
+  enabled: boolean;
+  localLabel: string;
+  onToggle: () => void;
+}) {
+  return (
+    <div style={skillCardStyle}>
+      <div style={skillCardHeaderStyle}>
+        <span style={sourceTagStyle}>{skill.source === "local" ? localLabel : skill.source}</span>
+        <strong style={enabled ? skillNameStyle : disabledSkillNameStyle}>{skill.name}</strong>
+        <span style={skillHeaderSpacerStyle} />
+        {skill.entryPath === undefined ? null : (
+          <SkillSwitch checked={enabled} label={skill.name} onToggle={onToggle} />
+        )}
+      </div>
+      <p style={enabled ? skillDescriptionStyle : disabledSkillDescriptionStyle}>
+        {skill.description}
+      </p>
+    </div>
+  );
+}
+
+/** 启停开关：按官方 Switch 规格复刻（button[role=switch][aria-checked] + thumb），颜色只用官方语义 token。 */
+function SkillSwitch({
+  checked,
+  label,
+  onToggle,
+}: {
+  checked: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      data-skill-reference="toggle"
+      style={checked ? checkedSwitchStyle : switchStyle}
+      onClick={onToggle}
+    >
+      <span style={checked ? checkedSwitchThumbStyle : switchThumbStyle} />
+    </button>
   );
 }
 
@@ -345,31 +404,50 @@ const footerStyle: CSSProperties = {
 
 const sectionTitleStyle: CSSProperties = { margin: "0 0 8px", fontSize: 13, fontWeight: 600 };
 
-// 配置单元容器：引用声明/预览共用，区分于外层内容区
+// 配置单元容器：引用声明/预览共用，比外层内容区浮起一级（卡片再浮一级，见 skillCardStyle）
 const cardBoxStyle: CSSProperties = {
   padding: 12,
   borderRadius: 10,
   border: "1px solid var(--dsw-alias-border-l2)",
-  background: "var(--dsw-alias-bg-layer-3)",
+  background: "var(--dsw-alias-bg-layer-1)",
 };
 
 const previewCardStyle: CSSProperties = {
   padding: 12,
   borderRadius: 10,
   border: "1px solid var(--dsw-alias-border-l2)",
-  background: "var(--dsw-alias-bg-layer-3)",
+  background: "var(--dsw-alias-bg-layer-1)",
 };
 
-const tagRowStyle: CSSProperties = {
+const mutedStyle: CSSProperties = { color: "var(--dsw-alias-label-tertiary)", fontSize: 13 };
+
+// 预览卡片列表：纵向排列，卡片间距统一
+const skillListStyle: CSSProperties = {
   display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-  marginTop: 10,
-  paddingTop: 10,
-  borderTop: "1px solid var(--dsw-alias-border-l1)",
+  flexDirection: "column",
+  gap: 8,
 };
 
-const tagStyle: CSSProperties = {
+// 卡片表面：浅色下 bg-layer-1/2/3 与 bg-base 同为纯白，层级差只能由 bg-module-platform 给出
+// （浅 #f5f6f7 / 深 #353638），故卡片比容器亮一档而非沿用 layer 序号
+const skillCardStyle: CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: "1px solid var(--dsw-alias-border-l2)",
+  background: "var(--dsw-alias-bg-module-platform)",
+};
+
+const skillCardHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const skillHeaderSpacerStyle: CSSProperties = { flex: "1 1 auto" };
+
+// 来源标签前置：第一视觉位回答「这个 skill 从哪来」
+const sourceTagStyle: CSSProperties = {
+  flex: "0 0 auto",
   fontSize: 12,
   color: "var(--dsw-alias-label-secondary)",
   border: "1px solid var(--dsw-alias-border-l1)",
@@ -377,9 +455,62 @@ const tagStyle: CSSProperties = {
   padding: "1px 8px",
 };
 
-const mutedStyle: CSSProperties = { color: "var(--dsw-alias-label-tertiary)", fontSize: 13 };
+const skillNameStyle: CSSProperties = { fontSize: 13, fontWeight: 600 };
 
-const sourceStyle: CSSProperties = { color: "var(--dsw-alias-label-tertiary)", fontSize: 12 };
+const disabledSkillNameStyle: CSSProperties = {
+  ...skillNameStyle,
+  color: "var(--dsw-alias-label-dimmed)",
+};
+
+// 描述限两行超出省略，卡片高度因此稳定
+const skillDescriptionStyle: CSSProperties = {
+  margin: "6px 0 0",
+  fontSize: 12,
+  lineHeight: "18px",
+  color: "var(--dsw-alias-label-secondary)",
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 2,
+  overflow: "hidden",
+};
+
+const disabledSkillDescriptionStyle: CSSProperties = {
+  ...skillDescriptionStyle,
+  color: "var(--dsw-alias-label-dimmed)",
+};
+
+// 启停开关：尺寸/间距/过渡对齐官方 Switch（官方无 switch 专用 token，取语义最接近的官方 token）
+const switchStyle: CSSProperties = {
+  boxSizing: "border-box",
+  position: "relative",
+  flex: "0 0 auto",
+  width: 36,
+  height: 20,
+  padding: 2,
+  border: 0,
+  borderRadius: 10,
+  background: "var(--dsw-alias-border-l3)",
+  cursor: "pointer",
+};
+
+const checkedSwitchStyle: CSSProperties = {
+  ...switchStyle,
+  background: "var(--dsw-alias-brand-primary)",
+};
+
+const switchThumbStyle: CSSProperties = {
+  display: "block",
+  width: 16,
+  height: 16,
+  borderRadius: "50%",
+  background: "var(--dsw-alias-label-primary-foreground)",
+  transition: "transform .12s ease",
+};
+
+const checkedSwitchThumbStyle: CSSProperties = {
+  ...switchThumbStyle,
+  transform: "translateX(16px)",
+};
 
 const errorStyle: CSSProperties = {
   padding: "8px 16px",

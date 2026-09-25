@@ -46,8 +46,21 @@ test("list and inspect descriptors take single targetPath param", () => {
 
 test("referenceEntrySchema validates shape", () => {
   assert.deepEqual(referenceEntrySchema.parse({ name: "dev", path: "D:/dev" }), { name: "dev", path: "D:/dev" });
+  assert.deepEqual(referenceEntrySchema.parse({ name: "dev", path: "D:/dev", skills: ["alpha"] }), {
+    name: "dev",
+    path: "D:/dev",
+    skills: ["alpha"],
+  });
+  assert.deepEqual(referenceEntrySchema.parse({ name: "dev", path: "D:/dev", skills: [] }), {
+    name: "dev",
+    path: "D:/dev",
+    skills: [],
+  });
   assert.throws(() => referenceEntrySchema.parse({ name: "", path: "x" }));
   assert.throws(() => referenceEntrySchema.parse({ name: "x" }));
+  assert.throws(() => referenceEntrySchema.parse({ name: "x", path: "y", skills: [7] }));
+  assert.throws(() => referenceEntrySchema.parse({ name: "x", path: "y", skills: [""] }));
+  assert.throws(() => referenceEntrySchema.parse({ name: "x", path: "y", skills: "alpha" }));
 });
 
 test("skillReferenceResultSchema accepts entries plus optional error", () => {
@@ -58,21 +71,50 @@ test("skillReferenceResultSchema accepts entries plus optional error", () => {
   );
 });
 
-test("inspectResultSchema accepts entries with status enum and skills with source", () => {
+test("inspectResultSchema accepts entries with status enum and skills with enabled/entryPath", () => {
   assert.deepEqual(
     inspectResultSchema.parse({
       entries: [{ name: "dev", path: "D:/dev", status: "ok" }],
-      skills: [{ name: "alpha", description: "a", modelInvocable: true, source: "dev" }],
+      skills: [
+        {
+          name: "alpha",
+          description: "a",
+          modelInvocable: true,
+          source: "dev",
+          enabled: true,
+          entryPath: "D:/dev",
+        },
+      ],
     }),
     {
       entries: [{ name: "dev", path: "D:/dev", status: "ok" }],
-      skills: [{ name: "alpha", description: "a", modelInvocable: true, source: "dev" }],
+      skills: [
+        {
+          name: "alpha",
+          description: "a",
+          modelInvocable: true,
+          source: "dev",
+          enabled: true,
+          entryPath: "D:/dev",
+        },
+      ],
     },
+  );
+  // 本地项没有 entryPath，停用项 enabled=false
+  assert.deepEqual(
+    inspectResultSchema.parse({
+      entries: [],
+      skills: [{ name: "local", description: "l", modelInvocable: false, source: "local", enabled: false }],
+    }).skills,
+    [{ name: "local", description: "l", modelInvocable: false, source: "local", enabled: false }],
   );
   assert.throws(() =>
     inspectResultSchema.parse({ entries: [{ name: "dev", path: "D:/dev", status: "bogus" }], skills: [] }),
   );
   assert.throws(() =>
-    inspectResultSchema.parse({ entries: [], skills: [{ name: "a", description: "", modelInvocable: true, source: "" }] }),
+    inspectResultSchema.parse({ entries: [], skills: [{ name: "a", description: "", modelInvocable: true, source: "", enabled: true }] }),
+  );
+  assert.throws(() =>
+    inspectResultSchema.parse({ entries: [], skills: [{ name: "a", description: "a", modelInvocable: true, source: "dev" }] }),
   );
 });
