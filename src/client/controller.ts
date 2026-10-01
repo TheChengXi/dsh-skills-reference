@@ -6,7 +6,9 @@
  *
  * 边界：只通过注入的 remote/sessions/pickDirectory 依赖触达宿主；targetPath 默认取当前会话的 cwd（sessions 快照
  * byId[current].cwd），可切换（pickDirectory/手填）；编辑态 entries 是副本，保存才整体 replace；业务错误以 state.error
- * 呈现而非抛错；inspect 失败与 list 失败同样降级为 error 或空预览，不崩溃；开关以「条目源路径 entryPath」回绑条目
+ * 呈现而非抛错；目标工作区不可用（list 回传 unavailable）时进入不可用态——清空 entries/baseline/health/skills、置
+ * unavailable 并在 error 承载原因，且不再调用 inspect，改回可用路径后该标志复位；inspect 失败与 list 失败同样降级为
+ * error 或空预览，不崩溃；开关以「条目源路径 entryPath」回绑条目
  * （编辑态增删条目会让下标漂移，同名源又让展示名歧义），路径失配则该 skill 不可切换；toggleSkill 以该源当前全量 skill
  * 名为基准算出新白名单，算出的清单覆盖全量时清除该字段（回到「全量跟随」，源新增 skill 继续自动生效）；预览项的启用态由
  * isSkillEnabled 从编辑态白名单派生，开关一点即变、取消即回滚，不等保存后重跑 inspect。
@@ -20,6 +22,8 @@
  * - toggleSkill 传入编辑态中不存在的 entryPath 时不改动任何条目
  * - isSkillEnabled 跟随编辑态白名单：缺省/空数组视为全量生效；本地项与编辑态已删除的条目沿用 inspect 快照值
  * - 切换 targetPath 后重新 load（list+inspect），旧错误清除
+ * - list 回传 unavailable 时 unavailable=true、entries/baseline/health/skills 为空、phase=ready、dirty 为假、不调用 inspect
+ * - 由不可用路径切到可用路径后 unavailable 复位为 false，并载入声明与预览
  */
 export interface ReferenceEntryWire {
   name: string;
@@ -54,9 +58,16 @@ export interface RemoteResultLike<T> {
   error?: RemoteFailureLike;
 }
 
+/** list / replace 的 wire 返回：条目 + 可选错误描述 + 可选「目标工作区不可用」标记。 */
+export interface ReferenceResultWire {
+  entries: ReferenceEntryWire[];
+  error?: string;
+  unavailable?: boolean;
+}
+
 export interface SkillReferenceRemote {
-  list(targetPath: string): Promise<RemoteResultLike<{ entries: ReferenceEntryWire[]; error?: string }>>;
-  replace(targetPath: string, entries: ReferenceEntryWire[]): Promise<RemoteResultLike<{ entries: ReferenceEntryWire[]; error?: string }>>;
+  list(targetPath: string): Promise<RemoteResultLike<ReferenceResultWire>>;
+  replace(targetPath: string, entries: ReferenceEntryWire[]): Promise<RemoteResultLike<ReferenceResultWire>>;
   inspect(targetPath: string): Promise<RemoteResultLike<{ entries: InspectEntryWire[]; skills: InspectSkillWire[]; error?: string }>>;
 }
 
@@ -81,6 +92,8 @@ export interface PanelState {
   open: boolean;
   phase: PanelPhase;
   targetPath: string | null;
+  /** 目标工作区不可用：面板据此隐藏编辑区，与「声明损坏」等业务错误区分（后者保留编辑区供改写修复）。 */
+  unavailable: boolean;
   entries: ReferenceEntryWire[];
   baseline: ReferenceEntryWire[];
   health: InspectEntryWire[];
@@ -92,11 +105,17 @@ const INITIAL: PanelState = {
   open: false,
   phase: "idle",
   targetPath: null,
+  unavailable: false,
   entries: [],
   baseline: [],
   health: [],
   skills: [],
 };
+
+/** 清空依赖目标工作区的一切结果：不可用或载入失败时都不该展示它们。 */
+function clearPanelResults(): Pick<PanelState, "entries" | "baseline" | "health" | "skills"> {
+  return { entries: [], baseline: [], health: [], skills: [] };
+}
 
 export class SkillReferencePanelController {
   private readonly deps: ControllerDeps;
@@ -221,6 +240,11 @@ export class SkillReferencePanelController {
       return;
     }
     const value = result.value!;
+    if (value.unavailable === true) {
+      // 保存途中目标工作区失效：与 list 一致地进入不可用态（编辑副本随之丢弃，避免与不可用态展示冲突）
+      this.enterUnavailable(value.error);
+      return;
+    }
     if (value.error !== undefined) {
       this.set({ phase: "error", error: value.error });
       return;
@@ -251,36 +275,48 @@ export class SkillReferencePanelController {
   private async load(): Promise<void> {
     const targetPath = this.state.targetPath;
     if (targetPath === null) {
-      this.set({ phase: "ready", error: "未指定目标工作区，请选择或手填" });
+      this.set({ phase: "ready", unavailable: false, error: "未指定目标工作区，请选择或手填" });
       return;
     }
-    const [declResult, preview] = await Promise.all([
-      this.deps.remote.list(targetPath),
-      this.loadPreview(targetPath),
-    ]);
+    const declResult = await this.deps.remote.list(targetPath);
     if (!declResult.ok) {
-      this.set({ phase: "error", error: declResult.error?.message ?? "list 失败" });
-      return;
-    }
-    const decl = declResult.value!;
-    if (decl.error !== undefined) {
       this.set({
         phase: "error",
-        entries: [],
-        baseline: [],
-        health: [],
-        skills: [],
-        error: decl.error,
+        unavailable: false,
+        error: declResult.error?.message ?? "list 失败",
       });
       return;
     }
+    const decl = declResult.value!;
+    if (decl.unavailable === true) {
+      this.enterUnavailable(decl.error);
+      return;
+    }
+    if (decl.error !== undefined) {
+      // 声明损坏等业务错误仍保留编辑区（用户在面板内改写修复），故不进入不可用态
+      this.set({ phase: "error", unavailable: false, ...clearPanelResults(), error: decl.error });
+      return;
+    }
+    // 可用才巡检：不可用时不做基于不存在路径的逐源扫描，预览因此不会基于无效路径出现
+    const preview = await this.loadPreview(targetPath);
     this.set({
       phase: "ready",
+      unavailable: false,
       entries: decl.entries.map((e) => ({ ...e })),
       baseline: decl.entries.map((e) => ({ ...e })),
       health: preview.health,
       skills: preview.skills,
       error: undefined,
+    });
+  }
+
+  /** 进入不可用态：清空基于该路径的一切结果，原因交给 error 承载；面板据此隐藏编辑区。 */
+  private enterUnavailable(error: string | undefined): void {
+    this.set({
+      phase: "ready",
+      unavailable: true,
+      ...clearPanelResults(),
+      error: error ?? "目标工作区不可用",
     });
   }
 

@@ -4,16 +4,21 @@
  * list / replace / inspect 方法。它只做宿主侧编排，skill 发现由 reference-provider 与 source-inspection 负责。
  *
  * 边界：入参统一为显式 targetPath（工作区根路径字符串，不依赖 sessionId/ctx.sessions）；targetPath 为空串 → 返回
- * { entries: [], error } 而非 throw；声明 YAML 损坏 → 返回 { entries: [], error }；replace 写入成功后才对
- * 该 targetPath 调注入的 invalidate(cwd)（精准失效）；inspect 委托 source-inspection 并捕获其抛错降级为 error 字段。
+ * { entries: [], error } 而非 throw；targetPath 不是已存在的目录 → list/replace 返回 { entries: [], unavailable: true,
+ * error }，replace 因此不触达 writeReferences、不创建任何目录，可用时返回对象不含 unavailable 键；
+ * 声明 YAML 损坏 → 返回 { entries: [], error }；replace 写入成功后才对该 targetPath 调注入的 invalidate(cwd)（精准失效）；
+ * inspect 委托 source-inspection 并捕获其抛错降级为 error 字段——它不做可用性判定，面板在不可用时不会调用它。
  *
  * 验收条件：
  * - list 对「无声明文件」的 targetPath 返回 { entries: [], error: undefined }
  * - replace 写回 entries 后 readReferences 能读回相同条目，且 invalidate 恰好被以该 targetPath 调用一次
  * - targetPath 空串时返回 error 字符串，不抛异常
+ * - targetPath 不是已存在的目录时，list/replace 返回 unavailable: true 且 entries 为空；replace 不写出文件、不建目录
+ * - targetPath 可用时 list/replace 的返回不含 unavailable 键
  * - inspect 返回 { entries, skills }（健康度与来源标注），declaration 损坏时返回 error
  */
 import { Service, type Context } from "@deepseek-ai/cordis";
+import { isExistingDirectory } from "./fs-directory.js";
 import { readReferences, writeReferences } from "./references-store.js";
 import type { ReferenceEntry } from "./schema.js";
 import type { InspectEntry, InspectResult, InspectSkill } from "./source-inspection.js";
@@ -21,6 +26,8 @@ import type { InspectEntry, InspectResult, InspectSkill } from "./source-inspect
 export interface SkillReferenceResult {
   entries: ReferenceEntry[];
   error?: string;
+  /** 目标工作区不可用（路径不存在或不是目录）；可用时该键不出现。 */
+  unavailable?: boolean;
 }
 
 export interface SkillInspectResult {
@@ -57,6 +64,7 @@ export class SkillReferenceService extends Service {
   async list(targetPath: string): Promise<SkillReferenceResult> {
     const assertion = assertTargetPath(targetPath);
     if (assertion !== undefined) return assertion;
+    if (!(await isExistingDirectory(targetPath))) return unavailableResult(targetPath);
     try {
       return { entries: await readReferences(targetPath) };
     } catch (error) {
@@ -67,6 +75,7 @@ export class SkillReferenceService extends Service {
   async replace(targetPath: string, entries: ReferenceEntry[]): Promise<SkillReferenceResult> {
     const assertion = assertTargetPath(targetPath);
     if (assertion !== undefined) return assertion;
+    if (!(await isExistingDirectory(targetPath))) return unavailableResult(targetPath);
     try {
       await writeReferences(targetPath, entries);
       this.deps.invalidate(targetPath);
@@ -94,6 +103,15 @@ function assertTargetPath(targetPath: string): SkillReferenceResult | undefined 
     return { entries: [], error: "targetPath 为空" };
   }
   return undefined;
+}
+
+/** 目标工作区不可用时的统一返回：标记 unavailable 并由 error 承载可展示的原因。 */
+function unavailableResult(targetPath: string): SkillReferenceResult {
+  return {
+    entries: [],
+    unavailable: true,
+    error: `目标工作区不可用: ${targetPath} 不存在或不是目录`,
+  };
 }
 
 function messageOf(error: unknown): string {

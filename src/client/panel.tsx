@@ -15,6 +15,8 @@
  * 关态 border-l3、开态 brand-primary、thumb label-primary-foreground），本地 skill 无开关；启用态取自 controller.isSkillEnabled
  * （由编辑态白名单派生，点击即变、取消即回滚），停用项不动卡片底色、不设透明度，只把名称与描述取 label-dimmed
  * （卡片仍保留在列表中可见）。
+ * 目标工作区选择器（输入框 + 选择目录）在不可用态仍渲染——它是改回可用路径的唯一入口；声明列表、引用源状态、预览三区
+ * 仅 state.unavailable 为假时渲染。
  *
  * 验收条件：
  * - open=false 时渲染 null（不占 overlay 布局）
@@ -24,6 +26,7 @@
  * - 预览区每 skill 渲染为一张卡片：来源标签在最左、名称居中、带 entryPath 的卡片右侧是启停开关；描述限两行超出省略；
  *   停用项的名称与描述取 label-dimmed；不再渲染重复罗列 skill 名的 tag 行
  * - 保存/取消 disabled 跟随 controller.dirty 与 phase
+ * - unavailable 为真时只渲染目标工作区选择器与错误提示，声明列表/引用源状态/预览均不渲染，保存与取消均 disabled
  * - 入口按钮显示 t("entry.label")、hover 时切换背景色、点击调 controller.open()
  */
 import { useState, useSyncExternalStore, type CSSProperties } from "react";
@@ -88,7 +91,8 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
           <div style={{ padding: 16 }}>{t("panel.loading")}</div>
         ) : (
           <div style={{ padding: 16, overflowY: "auto" }}>
-            {/* 1. 目标工作区：文案内嵌 placeholder（无框外标题）+ 占满宽度输入 + 右侧「选择目录」辅助按钮 */}
+            {/* 1. 目标工作区：文案内嵌 placeholder（无框外标题）+ 占满宽度输入 + 右侧「选择目录」辅助按钮；
+                两态常驻——不可用态下它是改回可用路径的唯一入口 */}
             <section>
               <div style={entryRowStyle}>
                 <input
@@ -103,81 +107,86 @@ export function SkillReferencePanel({ controller, t }: PanelComponentProps) {
               </div>
             </section>
 
-            {/* 2. 引用声明区：整组收进卡片容器，作为完整配置单元 */}
-            <section style={{ marginTop: 16 }}>
-              <h4 style={sectionTitleStyle}>{t("panel.references")}</h4>
-              <div style={cardBoxStyle}>
-                {state.entries.length === 0 ? (
-                  <div style={mutedStyle}>{t("panel.empty")}</div>
-                ) : (
-                  state.entries.map((entry, index) => (
-                    <div key={index} style={entryRowStyle}>
-                      <input
-                        style={{ ...inputStyle, flex: "1 1 30%" }}
-                        value={entry.name}
-                        placeholder={t("panel.name")}
-                        onChange={(event) => controller.updateEntry(index, { name: event.target.value })}
-                      />
-                      <input
-                        style={{ ...inputStyle, flex: "2 1 auto" }}
-                        value={entry.path}
-                        placeholder={t("panel.path")}
-                        onChange={(event) => controller.updateEntry(index, { path: event.target.value })}
-                      />
-                      <button type="button" style={compactButtonStyle} onClick={() => void controller.pickEntryPath(index)}>
-                        {t("panel.browse")}
-                      </button>
-                      <button type="button" style={compactButtonStyle} onClick={() => controller.removeEntry(index)}>
-                        {t("panel.remove")}
+            {/* 2~4 编辑区：目标工作区不可用时整体不渲染（错误提示由顶部状态条承担） */}
+            {state.unavailable ? null : (
+              <>
+                {/* 2. 引用声明区：整组收进卡片容器，作为完整配置单元 */}
+                <section style={{ marginTop: 16 }}>
+                  <h4 style={sectionTitleStyle}>{t("panel.references")}</h4>
+                  <div style={cardBoxStyle}>
+                    {state.entries.length === 0 ? (
+                      <div style={mutedStyle}>{t("panel.empty")}</div>
+                    ) : (
+                      state.entries.map((entry, index) => (
+                        <div key={index} style={entryRowStyle}>
+                          <input
+                            style={{ ...inputStyle, flex: "1 1 30%" }}
+                            value={entry.name}
+                            placeholder={t("panel.name")}
+                            onChange={(event) => controller.updateEntry(index, { name: event.target.value })}
+                          />
+                          <input
+                            style={{ ...inputStyle, flex: "2 1 auto" }}
+                            value={entry.path}
+                            placeholder={t("panel.path")}
+                            onChange={(event) => controller.updateEntry(index, { path: event.target.value })}
+                          />
+                          <button type="button" style={compactButtonStyle} onClick={() => void controller.pickEntryPath(index)}>
+                            {t("panel.browse")}
+                          </button>
+                          <button type="button" style={compactButtonStyle} onClick={() => controller.removeEntry(index)}>
+                            {t("panel.remove")}
+                          </button>
+                        </div>
+                      ))
+                    )}
+                    <div style={{ marginTop: 8 }}>
+                      <button type="button" style={buttonStyle} onClick={() => controller.addEntry()}>
+                        {t("panel.add")}
                       </button>
                     </div>
-                  ))
-                )}
-                <div style={{ marginTop: 8 }}>
-                  <button type="button" style={buttonStyle} onClick={() => controller.addEntry()}>
-                    {t("panel.add")}
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {state.health.length > 0 ? (
-              <section style={{ marginTop: 16 }}>
-                <h4 style={sectionTitleStyle}>{t("panel.health")}</h4>
-                {state.health.map((entry, index) => (
-                  <div key={index} style={entryRowStyle}>
-                    <code>{entry.name}</code>
-                    <span style={statusStyle(entry.status)}>{statusLabel(entry.status, t)}</span>
                   </div>
-                ))}
-              </section>
-            ) : null}
+                </section>
 
-            {/* 3. 预览区：逐 skill 卡片——来源标签前置、名称、右侧启停开关、描述限两行 */}
-            <section style={{ marginTop: 16 }}>
-              <h4 style={sectionTitleStyle}>{t("panel.preview")}</h4>
-              <div style={previewCardStyle}>
-                {state.skills.length === 0 ? (
-                  <div style={mutedStyle}>{t("panel.previewEmpty")}</div>
-                ) : (
-                  <div style={skillListStyle}>
-                    {state.skills.map((skill) => (
-                      <SkillPreviewCard
-                        key={`${skill.entryPath ?? "local"}:${skill.name}`}
-                        skill={skill}
-                        enabled={controller.isSkillEnabled(skill)}
-                        localLabel={t("panel.local")}
-                        onToggle={() => {
-                          if (skill.entryPath !== undefined) {
-                            controller.toggleSkill(skill.entryPath, skill.name);
-                          }
-                        }}
-                      />
+                {state.health.length > 0 ? (
+                  <section style={{ marginTop: 16 }}>
+                    <h4 style={sectionTitleStyle}>{t("panel.health")}</h4>
+                    {state.health.map((entry, index) => (
+                      <div key={index} style={entryRowStyle}>
+                        <code>{entry.name}</code>
+                        <span style={statusStyle(entry.status)}>{statusLabel(entry.status, t)}</span>
+                      </div>
                     ))}
+                  </section>
+                ) : null}
+
+                {/* 3. 预览区：逐 skill 卡片——来源标签前置、名称、右侧启停开关、描述限两行 */}
+                <section style={{ marginTop: 16 }}>
+                  <h4 style={sectionTitleStyle}>{t("panel.preview")}</h4>
+                  <div style={previewCardStyle}>
+                    {state.skills.length === 0 ? (
+                      <div style={mutedStyle}>{t("panel.previewEmpty")}</div>
+                    ) : (
+                      <div style={skillListStyle}>
+                        {state.skills.map((skill) => (
+                          <SkillPreviewCard
+                            key={`${skill.entryPath ?? "local"}:${skill.name}`}
+                            skill={skill}
+                            enabled={controller.isSkillEnabled(skill)}
+                            localLabel={t("panel.local")}
+                            onToggle={() => {
+                              if (skill.entryPath !== undefined) {
+                                controller.toggleSkill(skill.entryPath, skill.name);
+                              }
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </section>
+                </section>
+              </>
+            )}
           </div>
         )}
 

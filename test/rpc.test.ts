@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SkillReferenceService } from "../src/rpc.js";
@@ -118,4 +119,62 @@ test("inspect returns error when inspection throws", async () => {
     },
   });
   assert.deepEqual(await service.inspect("D:/t"), { entries: [], skills: [], error: "巡检失败: boom" });
+});
+
+test("list reports unavailable when targetPath is not an existing directory", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "skill-ref-rpc-"));
+  try {
+    const service = new SkillReferenceService(makeCtx(), { invalidate: () => {}, inspect: makeInspect() });
+    const result = await service.list(join(dir, "missing"));
+    assert.equal(result.unavailable, true);
+    assert.deepEqual(result.entries, []);
+    assert.match(result.error ?? "", /目标工作区不可用/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("list treats an existing file as unavailable", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "skill-ref-rpc-"));
+  try {
+    const file = join(dir, "not-a-dir.txt");
+    await writeFile(file, "x", "utf8");
+    const service = new SkillReferenceService(makeCtx(), { invalidate: () => {}, inspect: makeInspect() });
+    assert.equal((await service.list(file)).unavailable, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("replace refuses to write when targetPath is not an existing directory", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "skill-ref-rpc-"));
+  try {
+    let invalidated = 0;
+    const service = new SkillReferenceService(makeCtx(), {
+      invalidate: () => {
+        invalidated += 1;
+      },
+      inspect: makeInspect(),
+    });
+    const missing = join(dir, "missing");
+    const result = await service.replace(missing, [{ name: "a", path: "b" }]);
+    assert.equal(result.unavailable, true);
+    assert.equal(invalidated, 0);
+    assert.equal(existsSync(missing), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("available targetPath produces results without the unavailable key", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "skill-ref-rpc-"));
+  try {
+    const service = new SkillReferenceService(makeCtx(), { invalidate: () => {}, inspect: makeInspect() });
+    const listed = await service.list(dir);
+    assert.deepEqual(listed, { entries: [] });
+    assert.equal("unavailable" in listed, false);
+    assert.equal("unavailable" in (await service.replace(dir, [{ name: "a", path: "b" }])), false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

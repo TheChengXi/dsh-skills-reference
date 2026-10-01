@@ -5,15 +5,17 @@
  * 保证两端参数/结果编解码一致。
  *
  * 边界：list/replace/inspect 统一以显式 targetPath（目标工作区根路径）定位，不依赖 sessionId；条目形状为
- * { name, path, skills? }，skills 缺省或空数组表示该源全部 skill 生效；inspect 返回逐源健康度（status: ok/empty/invalid）
- * 与逐 skill 记录（source 为本地或某引用源名，enabled 表示是否生效，entryPath 标识所属声明条目、本地项缺省）；
- * 业务错误（声明损坏、目标路径缺失）走 error 字段而非 throw。
+ * { name, path, skills? }，skills 缺省或空数组表示该源全部 skill 生效；list/replace 的返回含可选 unavailable——
+ * 目标工作区不可用（路径不存在或不是目录）时为 true，此时 entries 为空、error 承载原因，可用时该键不出现；
+ * inspect 返回逐源健康度（status: ok/empty/invalid）与逐 skill 记录（source 为本地或某引用源名，enabled 表示是否生效，
+ * entryPath 标识所属声明条目、本地项缺省）；业务错误（声明损坏、目标路径缺失）走 error 字段而非 throw。
  *
  * 验收条件：
  * - SKILL_REFERENCE_DESCRIPTORS 含 list、replace、inspect 三个 descriptor，且 service/namespace 均为 "skillReference"
  * - 每个 descriptor 的参数与 result 均为 strict codec，schema.parse 是函数（满足 registry validateInvocation）
  * - list/replace/inspect 首参数均为 targetPath；replace 第二参为 entries
  * - referenceEntrySchema 接受含 skills 的条目、拒绝 skills 含非字符串
+ * - skillReferenceResultSchema 接受含 unavailable 的返回，且缺省时解析结果不含该键
  * - inspectResultSchema 的 skills 项要求 enabled 布尔值，entryPath 可选
  */
 import { z } from "zod";
@@ -54,10 +56,11 @@ export const referenceEntrySchema = z.object({
   skills: z.array(z.string().min(1)).optional(),
 });
 
-/** list / replace 的统一返回：声明条目 + 可选的业务错误描述。 */
+/** list / replace 的统一返回：声明条目 + 可选业务错误描述 + 可选「目标工作区不可用」标记。 */
 export const skillReferenceResultSchema = z.object({
   entries: z.array(referenceEntrySchema),
   error: z.string().optional(),
+  unavailable: z.boolean().optional(),
 });
 
 export type SkillReferenceResultWire = z.infer<typeof skillReferenceResultSchema>;

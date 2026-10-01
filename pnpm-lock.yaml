@@ -27,6 +27,9 @@ importers:
       '@types/node':
         specifier: ^26.4.1
         version: 26.4.1
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.31
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -314,9 +317,18 @@ packages:
   '@types/node@26.4.1':
     resolution: {integrity: sha512-k97ENvZWtvA6yqz5/FS6a7duDgOPEeOQOc2iKS/nY6mX6qJUKtLnWzQS+Xj6tXweyj6ZcTAK2Qecetnvi9nCLA==}
 
+  '@types/prop-types@15.7.15':
+    resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
+  '@types/react@18.3.31':
+    resolution: {integrity: sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==}
+
   chokidar@5.0.0:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
     engines: {node: '>= 20.19.0'}
+
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   esbuild@0.28.2:
     resolution: {integrity: sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==}
@@ -539,9 +551,18 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
+  '@types/prop-types@15.7.15': {}
+
+  '@types/react@18.3.31':
+    dependencies:
+      '@types/prop-types': 15.7.15
+      csstype: 3.2.3
+
   chokidar@5.0.0:
     dependencies:
       readdirp: 5.1.1
+
+  csstype@3.2.3: {}
 
   esbuild@0.28.2:
     optionalDependencies:

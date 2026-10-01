@@ -118,3 +118,12 @@ test("inspectResultSchema accepts entries with status enum and skills with enabl
     inspectResultSchema.parse({ entries: [], skills: [{ name: "a", description: "a", modelInvocable: true, source: "dev" }] }),
   );
 });
+
+test("skillReferenceResultSchema carries unavailable only when provided", () => {
+  assert.deepEqual(
+    skillReferenceResultSchema.parse({ entries: [], unavailable: true, error: "目标工作区不可用" }),
+    { entries: [], unavailable: true, error: "目标工作区不可用" },
+  );
+  assert.equal("unavailable" in skillReferenceResultSchema.parse({ entries: [] }), false);
+  assert.throws(() => skillReferenceResultSchema.parse({ entries: [], unavailable: "yes" }));
+});

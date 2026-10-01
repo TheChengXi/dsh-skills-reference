@@ -3,20 +3,26 @@ summary: |
   跨工作区 skill 引用插件。宿主半：引用声明（.dsh/skill-references.yml）的数据存取 + 复用官方 dsh-skill-filesystem 的发现
   provider（引用源优先、随声明/目录变化按 cwd 精准失效；条目 skills 白名单在宿主侧真实生效——非白名单 skill 不进 catalog）+
   只读来源巡检 SourceInspection（逐源健康度 + 逐 skill 来源标注与生效/停用分流），经 Typert 暴露给浏览器的 list/replace/inspect
-  RPC（显式 targetPath 定位，不依赖会话）。Web 半：基于 React 的可视化面板（输入框工具行入口 + overlay 窗口），指定任意目标
-  工作区、图形化管理声明、逐 skill 卡片预览并单 skill 启停（改动进入编辑态，保存才落盘）。构建：build.mjs（esbuild 产出 lib/client.js）+ tsc。
+  RPC（显式 targetPath 定位，不依赖会话）；list/replace 前先判定目标工作区「存在且为目录」，不可用即拒绝写入、不创建任何目录。
+  Web 半：基于 React 的可视化面板（输入框工具行入口 + overlay 窗口），指定任意目标
+  工作区、图形化管理声明、逐 skill 卡片预览并单 skill 启停（改动进入编辑态，保存才落盘）；目标工作区不可用时整体转入不可用态
+  （提示 + 禁写 + 隐藏编辑区，目标工作区选择器常驻以便改回）。构建：build.mjs（esbuild 产出 lib/client.js）+ tsc，另以
+  tsconfig.client.json 对 src/client 做独立类型检查（bundler 解析 + @types/react）并并入 npm run build。
 
 groups:
   - name: 宿主数据与 skill 发现
     summary: 声明文件从 schema 到 skill provider 的完整宿主链路——声明 YAML 解析/序列化（含条目 skills 白名单）与白名单判定
       isSkillAllowed、读写存取、声明文件目录级可靠监测（reference-watch）、包装官方 FileSystemSkillProvider 为「引用源优先」的
-      skill 来源（逐源一个内层实例、按白名单过滤、白名单变化只刷新过滤快照不重建实例），随目录/声明变化失效重发现。
+      skill 来源（逐源一个内层实例、按白名单过滤、白名单变化只刷新过滤快照不重建实例），随目录/声明变化失效重发现；
+      「给定路径是否为已存在的目录」由 fs-directory 单一提供，源目录健康度与目标工作区可用性判定共用它以免口径漂移。
     files:
+      - test/fs-directory.test.ts
       - test/reference-provider.test.ts
       - test/reference-watch.test.ts
       - test/references-store.test.ts
       - test/schema.test.ts
       - test/skill-enablement.test.ts
+      - src/fs-directory.ts
       - src/reference-provider.ts
       - src/reference-watch.ts
       - src/references-store.ts
@@ -25,7 +31,8 @@ groups:
   - name: 宿主 Typert RPC 与装配
     summary: 把宿主声明读写与来源巡检暴露为浏览器可调用的远程方法——host/client 共享的 strict descriptor 契约、
       SkillReferenceService(list/replace/inspect)、只读 SourceInspection（逐源健康度 + 来源标注）、TYPERT manifestation，
-      以及把它们装配进 ctx.skills/ctx.typert 的入口。
+      以及把它们装配进 ctx.skills/ctx.typert 的入口。list/replace 入口先判定目标工作区可用（存在且为目录），不可用时以
+      unavailable 回传且 replace 不触达 writeReferences（不创建任何目录）；source-inspection 的 dirExists 即 fs-directory 本身。
     files:
       - test/contract.test.ts
       - test/rpc.test.ts
@@ -38,13 +45,17 @@ groups:
 
   - name: Client 可视化窗口
     summary: Web 半的面板能力——typert remote 装配、面板状态机（载入/编辑/保存/预览 + 单 skill 启停 toggleSkill；预览启用态由
-      编辑态白名单派生 isSkillEnabled，点击即变、取消即回滚）、React 面板与入口按钮组件（逐 skill 卡片：来源标签前置 + 描述
-      两行省略 + 官方规格启停开关；入口挂输入框工具行 conversation.input.left，仅选中会话时可及）、client 装配入口（目录选择经官方 ui-workspace 服务的 uiWorkspace.pickDirectory，目标工作区与引用源两处共用同一注入点），以及产出宿主 client 模块格式的
-      esbuild 构建脚本。面板样式由 DSH 原生语义 token（--dsw-alias-*）驱动、随主题色板（light/dark/system）自动适配深浅，
+      编辑态白名单派生 isSkillEnabled，点击即变、取消即回滚；目标工作区不可用时进入独立的 unavailable 态——清空并隐藏基于该路径的
+      一切结果，载入改为先判定可用再巡检）、React 面板与入口按钮组件（逐 skill 卡片：来源标签前置 + 描述
+      两行省略 + 官方规格启停开关；目标工作区选择器两态常驻，它是不可用时改回可用路径的唯一入口；入口挂输入框工具行 conversation.input.left，仅选中会话时可及）、client 装配入口（目录选择经官方 ui-workspace 服务的 uiWorkspace.pickDirectory，目标工作区与引用源两处共用同一注入点），以及产出宿主 client 模块格式的
+      esbuild 构建脚本与 client 半专属的类型检查配置（tsconfig.client.json：bundler 解析 + react-jsx + types 空；react 类型来自
+      devDependency @types/react，版本对齐官方 client 插件的 ~18.3.1）。面板样式由 DSH 原生语义 token（--dsw-alias-*）驱动、随主题色板（light/dark/system）自动适配深浅，
       不引用自造 token 或硬编码色值；表面层级为「bg-base → 容器 bg-layer-1 → 卡片 bg-module-platform」（浅色色板下 layer 序号
       无层级差，故卡片用 module-platform）。
     files:
       - build.mjs
+      - tsconfig.client.json
+      - test/panel-controller.test.ts
       - src/client/client.ts
       - src/client/controller.ts
       - src/client/panel.tsx
