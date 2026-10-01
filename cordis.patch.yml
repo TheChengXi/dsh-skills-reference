@@ -1,0 +1,11 @@
+# dsh-skills-reference 的 profile 层 patch：把插件自身作为一行插入 profile 组合。
+#
+# 为什么它必须随包发布（package.json 的 dsh.bundle.patch 指向本文件，files 与 exports 一并收录）：
+# 插件管理器只接受声明了 dsh.bundle.patch 的包作为 bundle，而 host 行必须先被插入并启用，
+# client 半（lib/client.js）才会被 dsh-client-modules 从已启用的 row 反查装配。
+#
+# id 与 web profile 里既有的手工 patch 行保持一致，便于两端配置对照；
+# name 必须等于安装后的包名，Loader 才能解析到本包。
+- insert:
+    - id: skill-reference
+      name: 'dsh-skills-reference'

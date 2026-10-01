@@ -18,15 +18,17 @@ test("three descriptors under skillReference namespace/service", () => {
   }
 });
 
-test("every parameter and result codec is strict with parse()", () => {
+test("every parameter and result codec is strict with a create() factory", () => {
   for (const d of SKILL_REFERENCE_DESCRIPTORS) {
     for (const p of d.parameters) {
       assert.equal(p.source, "json");
       assert.equal(p.codec.mode, "strict");
-      assert.equal(typeof p.codec.schema.parse, "function");
+      assert.equal(typeof p.codec.create, "function");
+      assert.equal(typeof p.codec.create().parse, "function");
     }
     assert.equal(d.result.mode, "strict");
-    assert.equal(typeof d.result.schema.parse, "function");
+    assert.equal(typeof d.result.create, "function");
+    assert.equal(typeof d.result.create().parse, "function");
   }
 });
 

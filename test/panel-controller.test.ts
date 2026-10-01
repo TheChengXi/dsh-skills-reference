@@ -22,7 +22,27 @@ function makeRemote(overrides: Partial<SkillReferenceRemote>): SkillReferenceRem
 function makeController(remote: SkillReferenceRemote, cwd = "D:/target") {
   return new SkillReferencePanelController({
     remote,
-    sessions: { list: { getSnapshot: () => ({ byId: { s1: { cwd } }, current: "s1" }) } },
+    sessions: {
+      list: {
+        getSnapshot: () => ({ ids: ["s1"], byId: { s1: { cwd, retainedBy: { mainView: 1 } } } }),
+      },
+    },
+    pickDirectory: async () => null,
+  });
+}
+
+/** 没有任何被主视图保留的会话时的快照（0.2.0 快照语义下 targetPath 无从推导）。 */
+function makeControllerWithoutMainView(remote: SkillReferenceRemote) {
+  return new SkillReferencePanelController({
+    remote,
+    sessions: {
+      list: {
+        getSnapshot: () => ({
+          ids: ["s1"],
+          byId: { s1: { cwd: "D:/target", retainedBy: { mainView: 0 } } },
+        }),
+      },
+    },
     pickDirectory: async () => null,
   });
 }
@@ -138,4 +158,17 @@ test("save 遇到 unavailable 时进入不可用态并丢弃编辑副本", async
   assert.deepEqual(state.baseline, []);
   assert.equal(controller.dirty, false);
   assert.match(state.error ?? "", /目标工作区不可用/);
+});
+
+test("无主视图会话时 targetPath 为 null 并提示未指定目标工作区", async () => {
+  const controller = makeControllerWithoutMainView(makeRemote({}));
+
+  controller.open();
+  await settle(controller);
+
+  const state = controller.getState();
+  assert.equal(state.targetPath, null);
+  assert.equal(state.phase, "ready");
+  assert.equal(state.unavailable, false);
+  assert.match(state.error ?? "", /未指定目标工作区/);
 });

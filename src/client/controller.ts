@@ -4,8 +4,9 @@
  * 逐 skill 生效/停用预览 + 编辑中的 entries 副本 + 单 skill 启停(toggleSkill) + 保存(replace)/取消(reset) + 选目录」
  * 的完整交互状态，通过 getState/subscribe 提供给面板组件（useSyncExternalStore）。
  *
- * 边界：只通过注入的 remote/sessions/pickDirectory 依赖触达宿主；targetPath 默认取当前会话的 cwd（sessions 快照
- * byId[current].cwd），可切换（pickDirectory/手填）；编辑态 entries 是副本，保存才整体 replace；业务错误以 state.error
+ * 边界：只通过注入的 remote/sessions/pickDirectory 依赖触达宿主；targetPath 默认取当前会话的 cwd——沿 sessions 快照
+ * ids 顺序取第一个 retainedBy.mainView > 0 的行（0.2.0 起快照不再携带 current，视图选中态由 ui-workspace 持有），
+ * 无主视图会话时为 null；可切换（pickDirectory/手填）；编辑态 entries 是副本，保存才整体 replace；业务错误以 state.error
  * 呈现而非抛错；目标工作区不可用（list 回传 unavailable）时进入不可用态——清空 entries/baseline/health/skills、置
  * unavailable 并在 error 承载原因，且不再调用 inspect，改回可用路径后该标志复位；inspect 失败与 list 失败同样降级为
  * error 或空预览，不崩溃；开关以「条目源路径 entryPath」回绑条目
@@ -14,7 +15,8 @@
  * isSkillEnabled 从编辑态白名单派生，开关一点即变、取消即回滚，不等保存后重跑 inspect。
  *
  * 验收条件：
- * - open 后 targetPath 默认等于当前会话 cwd，phase 进入 loading
+ * - open 后 targetPath 默认等于主视图会话（ids 顺序上首个 retainedBy.mainView > 0）的 cwd，phase 进入 loading
+ * - 无任何 retainedBy.mainView > 0 的会话时 targetPath 为 null，phase 进入 ready 并提示未指定目标工作区
  * - 载入后 entries===baseline、dirty=false；health（逐源健康度）与 skills（带来源与 enabled）就绪
  * - 编辑 entries 后 dirty=true；reset 后回到 baseline、dirty=false
  * - save 调 remote.replace(targetPath, entries)，成功后 baseline 更新、dirty=false、重新 inspect
@@ -73,11 +75,13 @@ export interface SkillReferenceRemote {
 
 export interface SessionRowLike {
   cwd?: string;
+  /** 保留该会话的视图计数：mainView > 0 表示它出现在主视图（0.2.0 快照语义，取代旧的 selected/current）。 */
+  retainedBy: { mainView: number };
 }
 
 export interface SessionsSnapshotLike {
+  ids: string[];
   byId: Record<string, SessionRowLike>;
-  current?: string;
 }
 
 export interface ControllerDeps {
@@ -265,11 +269,14 @@ export class SkillReferencePanelController {
     this.set({ entries: this.state.baseline.map((e) => ({ ...e })), error: undefined });
   }
 
+  /** 主视图会话的 cwd：沿快照 ids 顺序取首个被主视图保留（retainedBy.mainView > 0）的会话行；无主视图会话时为 null。 */
   private currentSessionCwd(): string | null {
     const snapshot = this.deps.sessions.list.getSnapshot();
-    const id = snapshot.current;
-    if (id === undefined) return null;
-    return snapshot.byId[id]?.cwd ?? null;
+    for (const id of snapshot.ids) {
+      const row = snapshot.byId[id];
+      if (row !== undefined && row.retainedBy.mainView > 0) return row.cwd ?? null;
+    }
+    return null;
   }
 
   private async load(): Promise<void> {

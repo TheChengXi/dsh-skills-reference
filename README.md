@@ -2,17 +2,42 @@
 
 DSH 插件：跨工作区 skill 引用。源工作区拥有 skill，其它工作区声明引用，一处更新处处复用，无需手动复制。
 
+面向 DSH 0.2.0-rc.2（web 端与桌面端同一运行时）。
+
 ## 功能
 
 - **引用声明**：在工作区本地 `.dsh/skill-references.yml` 声明「展示名 + 源工作区根路径」。
 - **引用注册**：复用官方 `dsh-skill-filesystem` 发现机制，把源工作区 `.dsh/skills` 整体注册进当前会话；源目录变化即时失效重发现，无需重启。
-- **可视化面板**：Web 输入框工具行「skill」入口（权限选择器右侧），图形化查看 / 添加 / 删除引用，预览已生效 skill 清单并逐个启停。
+- **可视化面板**：输入框工具行「skill」入口（权限选择器右侧），图形化查看 / 添加 / 删除引用，预览已生效 skill 清单并逐个启停。
 
 ## 引用语义
 
 - 纯跟随（只读，改动回源工作区统一改，本地不派生）。
 - 目录级引用 + 单 skill 白名单：声明条目可带 `skills` 列表，只有列表内的 skill 生效；缺省或空列表表示该源全量生效。
 - 同名冲突时引用源优先；被停用的引用源 skill 不占名，本地同名因此可回退。
+
+## 安装
+
+### 走插件管理器（一键安装）
+
+插件页安装以下任一来源：
+
+- registry 名：`dsh-skills-reference`
+- GitHub：`github:TheChengXi/dsh-skills-reference`
+
+安装成功后包名被追加进 profile 的 `dsh.profile.bundles`，包内 `cordis.patch.yml` 负责把插件行插入组合，host 半与 client 半随之加载。通常无需重启进程。
+
+本插件的构建产物随仓库提交（`lib/**`），因此从 GitHub 安装不需要放行任何构建脚本，装完即用。
+
+### 本地开发：同步到 profile
+
+```bash
+pnpm run sync    # 构建并同步 lib/ 与 package.json 到 web profile，之后重启 DSH 生效
+```
+
+目标 profile 根默认 `~/.dsh/profiles/web`，可用 `DSH_PROFILE_NAME` 换 profile，或用 `DSH_PROFILE_DIR` 直接给出 profile 根目录（在 DSH 会话内它已被注入为当前 profile 根）。插件目录恒为 `<profile 根>/node_modules/dsh-skills-reference`——不要把 `DSH_PROFILE_DIR` 指到插件目录本身，那会把 `package.json` 写到 profile 根并覆盖 profile 清单。
+
+> web profile 若已有手工的 `skill-reference` patch 行，**不要**再把本包加入 `dsh.profile.bundles`，否则同一 id 会被插入两次。
 
 ## 用法
 
@@ -34,15 +59,29 @@ DSH 插件：跨工作区 skill 引用。源工作区拥有 skill，其它工作
 ## 开发
 
 ```bash
-pnpm run build   # tsc 编译 host + esbuild 打包 client
-pnpm run sync    # 构建并同步 lib/ 与 package.json 到 DSH profile，之后重启 DSH 生效
+pnpm run build   # tsc 编译 host（lib/*.js 与 *.d.ts）+ esbuild 打包 client（lib/client.js）
 pnpm run test    # 单测
+pnpm run typecheck
 ```
 
-同步插件到当前用户的 DSH profile（目标目录由 `sync.mjs` 按用户主目录解析，可用环境变量 `DSH_PROFILE_DIR` 覆盖）。
+**改动源码后必须重新构建并提交 `lib/`**：插件从 GitHub 分发，产物不入库就装不起来（pnpm 对 git 依赖只执行 `prepare`，且该脚本在 pnpm 10.26+ 默认被拦截）。
+
+### 运行时版本对齐
+
+插件面向 DSH 0.2.0-rc.2。安装与启动时，DSH 会按 `semver.satisfies(运行时版本, peer 范围)` 校验 `peerDependencies` 里 `@deepseek-ai/dsh*` 的项，不匹配即拒绝安装并回滚 profile 清单。
+
+### web 端运行时升级
+
+若 web 端仍是 0.1.5-rc.3，需先升级再使用本版本（0.2.0 起 Typert 契约以 `codec.create()` 取代 `codec.schema`，旧运行时上插件无法加载）：
+
+```bash
+npm i -g @deepseek-ai/dsh@0.2.0-rc.2
+```
+
+升级后自行重启 DSH 生效。
 
 ## 测试
 
-`pnpm run test` 覆盖数据层、发现 provider、RPC 契约与来源巡检；其中 `test/skill-enablement.test.ts` 用真实文件系统验证白名单过滤与 `get` 委派。
+`pnpm run test` 覆盖数据层、发现 provider、RPC 契约、来源巡检与面板状态机；其中 `test/skill-enablement.test.ts` 用真实文件系统验证白名单过滤与 `get` 委派。
 
 手工走查：源工作区建 `.dsh/skills/alpha/SKILL.md`，引用工作区在面板里声明该源，验证发现 / 实时更新 / 同名冲突 / 面板增删 / 预览即时刷新 / 单 skill 启停（保存后落盘生效）。

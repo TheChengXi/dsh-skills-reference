@@ -1,7 +1,8 @@
 /**
  * 构建 client bundle（lib/client.js），产出宿主 client 模块格式：
  * `window.__ModuleLoader__.load({ id, factory: (require) => { ... return module.exports } })`。
- * 平台运行时不打包（external：cordis / react / react-jsx-runtime / dsh.client.inject 引用的 runtime+layout），
+ * 平台运行时不打包（external：cordis / react / react-jsx-runtime，以及 dsh.client.inject 声明的两个官方 client 包
+ * dsh-client-ui-conversation 与 dsh-client-ui-layout——它们由宿主以 seed 或图行提供），
  * zod 与 contract/controller/panel 一并打进 bundle。
  */
 import { build } from "esbuild";
@@ -15,7 +16,7 @@ const external = [
   "@deepseek-ai/cordis",
   "react",
   "react/jsx-runtime",
-  "@deepseek-ai/dsh-client-runtime",
+  "@deepseek-ai/dsh-client-ui-conversation",
   "@deepseek-ai/dsh-client-ui-layout",
 ];
 
